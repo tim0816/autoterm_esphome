@@ -1,6 +1,6 @@
 #include "autoterm_serial.h"
 
-/// CRC16 (Modbus)
+/// CRC16 Modbus (Little Endian)
 uint16_t crc16_modbus(const uint8_t *data, size_t length) {
   uint16_t crc = 0xFFFF;
   for (size_t pos = 0; pos < length; pos++) {
@@ -27,17 +27,16 @@ void AutotermHeaterComponent::update() {
 void AutotermHeaterComponent::process_byte(uint8_t b) {
   buffer.push_back(b);
 
-  // Mindestlänge prüfen
-  if (buffer.size() >= 5) {
-    // Check Preamble
+  if (buffer.size() >= 5) {  // Mindestlänge: Preamble + device + len + 2
     if (buffer[0] != 0xAA) {
       buffer.clear();
       return;
     }
-    uint8_t len = buffer[2]; // laut Protokoll: Byte2 = Länge des Payload
-    size_t total_len = 1 /*preamble*/ + 1 /*device*/ + 1 /*len*/ + len + 2 /*CRC*/ + 2 /*msg_id*/;
+
+    uint8_t len = buffer[2]; // Payload-Länge
+    size_t total_len = 1 + 1 + 1 + len + 2 + 2; // Preamble + device + len + payload + msg_id + CRC
+
     if (buffer.size() == total_len) {
-      // komplette Nachricht empfangen
       uint16_t crc_calc = crc16_modbus(buffer.data(), total_len - 2);
       uint16_t crc_recv = buffer[total_len - 2] | (buffer[total_len - 1] << 8);
       if (crc_calc == crc_recv) {
@@ -56,11 +55,10 @@ void AutotermHeaterComponent::parse_message(const std::vector<uint8_t> &msg) {
   uint8_t msg_id1 = msg[3];
   uint8_t msg_id2 = msg[4];
 
-  ESP_LOGD("autoterm", "Nachricht von dev=0x%02X id=%02X%02X len=%d", device, msg_id1, msg_id2, len);
+  ESP_LOGD("autoterm", "Nachricht dev=0x%02X id=%02X%02X len=%d", device, msg_id1, msg_id2, len);
 
-  // Beispiel: Status-Paket enthält Temperatur (°C*10) und Batteriespannung (mV)
-  // -> musst du anhand der Protokolldoku anpassen
-  if (msg_id2 == 0x10 && len >= 4) {
+  // Beispiel: msg_id2 = 0x10 = Statuspaket
+  if (msg_id2 == 0x10 && len >= 6) {
     int16_t temp_raw = msg[5] | (msg[6] << 8);
     float temp = temp_raw / 10.0f;
     temperature_sensor->publish_state(temp);
@@ -69,12 +67,11 @@ void AutotermHeaterComponent::parse_message(const std::vector<uint8_t> &msg) {
     float volt = volt_raw / 1000.0f;
     voltage_sensor->publish_state(volt);
 
-    status_sensor->publish_state(msg[9]);  // z. B. Statuscode
+    status_sensor->publish_state(msg[9]);  // Statuscode
   }
 }
 
 void AutotermHeaterComponent::request_status() {
-  // Beispiel: Anfragepaket an Heizung (Dummy, musst du mit Protokoll abgleichen)
   std::vector<uint8_t> pkt = {0xAA, 0x03, 0x02, 0x00, 0x10, 0x00, 0x00};
   uint16_t crc = crc16_modbus(pkt.data(), pkt.size());
   pkt.push_back(crc & 0xFF);

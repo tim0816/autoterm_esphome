@@ -217,6 +217,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   const uint8_t *p = &data[5];
   uint8_t s_hi = p[0];
   uint8_t s_lo = p[1];
+  uint16_t status_code = (static_cast<uint16_t>(s_hi) << 8) | s_lo;
   uint8_t fan_set_raw = p[11];
   uint8_t fan_actual_raw = p[12];
   uint8_t pump_raw = p[14];
@@ -230,22 +231,50 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   float pump_freq = pump_raw / 100.0f;
 
   const char *status_txt = "unknown";
-  if (status_val == 0.1f) status_txt = "standby";
-  else if (status_val == 1.0f) status_txt = "cooling flame sensor";
-  else if (status_val == 1.1f) status_txt = "ventilation";
-  else if (status_val == 2.1f) status_txt = "heating glow plug";
-  else if (status_val == 2.2f) status_txt = "ignition 1";
-  else if (status_val == 2.3f) status_txt = "ignition 2";
-  else if (status_val == 2.4f) status_txt = "heating combustion chamber";
-  else if (status_val == 3.0f) status_txt = "heating";
-  else if (status_val == 3.35f) status_txt = "only fan";
-  else if (status_val == 3.4f) status_txt = "cooling down";
-  else if (status_val == 4.0f) status_txt = "shutting down";
-  else if (status_val == 6.05) status_txt = "only fan";
+  switch (status_code) {
+    case 0x0001:
+      status_txt = "standby";
+      break;
+    case 0x0100:
+      status_txt = "cooling flame sensor";
+      break;
+    case 0x0101:
+      status_txt = "ventilation";
+      break;
+    case 0x0201:
+      status_txt = "heating glow plug";
+      break;
+    case 0x0202:
+      status_txt = "ignition 1";
+      break;
+    case 0x0203:
+      status_txt = "ignition 2";
+      break;
+    case 0x0204:
+      status_txt = "heating combustion chamber";
+      break;
+    case 0x0300:
+      status_txt = "heating";
+      break;
+    case 0x0323:
+      status_txt = "only fan";
+      break;
+    case 0x0304:
+      status_txt = "cooling down";
+      break;
+    case 0x0400:
+      status_txt = "shutting down";
+      break;
+    case 0x0605:
+      status_txt = "only fan";
+      break;
+    default:
+      break;
+  }
 
   ESP_LOGI("autoterm_uart",
-           "Status: %s | U=%.1fV | Heater %.0f°C | Fan %.0f/%.0f rpm | Pump %.2f Hz",
-           status_txt, voltage, heater_temp, fan_actual_rpm, fan_set_rpm, pump_freq);
+           "Status: %s (0x%02X%02X) | U=%.1fV | Heater %.0f°C | Fan %.0f/%.0f rpm | Pump %.2f Hz",
+           status_txt, s_hi, s_lo, voltage, heater_temp, fan_actual_rpm, fan_set_rpm, pump_freq);
 
   if (internal_temp_sensor_) internal_temp_sensor_->publish_state(internal_temp);
   if (external_temp_sensor_) external_temp_sensor_->publish_state(external_temp);

@@ -96,6 +96,15 @@ class AutotermPowerLevelNumber : public number::Number {
   void control(float value) override;
 };
 
+class AutotermVirtualPanelTemperatureNumber : public number::Number {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void control(float value) override;
+};
+
 class AutotermTemperatureSourceSelect : public select::Select {
  public:
   AutotermUART *parent_{nullptr};
@@ -163,6 +172,7 @@ class AutotermUART : public Component {
   AutotermSetTemperatureNumber *set_temperature_number_{nullptr};
   AutotermWorkTimeNumber *work_time_number_{nullptr};
   AutotermPowerLevelNumber *power_level_number_{nullptr};
+  AutotermVirtualPanelTemperatureNumber *virtual_panel_temp_number_{nullptr};
   AutotermTemperatureSourceSelect *temperature_source_select_{nullptr};
   AutotermUseWorkTimeSwitch *use_work_time_switch_{nullptr};
   AutotermWaitModeSwitch *wait_mode_switch_{nullptr};
@@ -245,6 +255,10 @@ class AutotermUART : public Component {
   }
   void set_power_level_number(AutotermPowerLevelNumber *n) {
     power_level_number_ = n;
+    if (n) n->setup_parent(this);
+  }
+  void set_virtual_panel_temp_number(AutotermVirtualPanelTemperatureNumber *n) {
+    virtual_panel_temp_number_ = n;
     if (n) n->setup_parent(this);
   }
   void set_temperature_source_select(AutotermTemperatureSourceSelect *s) {
@@ -418,6 +432,14 @@ void AutotermWorkTimeNumber::control(float value) {
 void AutotermPowerLevelNumber::control(float value) {
   publish_state(value);
   if (parent_) parent_->set_power_level(static_cast<uint8_t>(value));
+}
+
+void AutotermVirtualPanelTemperatureNumber::control(float value) {
+  if (parent_ == nullptr) {
+    publish_state(value);
+    return;
+  }
+  parent_->send_virtual_panel_temperature(value);
 }
 
 void AutotermTemperatureSourceSelect::control(const std::string &value) {
@@ -607,11 +629,6 @@ void AutotermUART::set_wait_mode(bool on) {
 }
 
 void AutotermUART::send_virtual_panel_temperature(float value) {
-  if (!uart_heater_) {
-    ESP_LOGW("autoterm_uart", "Cannot send virtual panel temperature without heater UART");
-    return;
-  }
-
   if (!std::isfinite(value)) {
     ESP_LOGW("autoterm_uart", "Ignoring non-finite virtual panel temperature %.2f", value);
     return;
@@ -620,6 +637,14 @@ void AutotermUART::send_virtual_panel_temperature(float value) {
   float clamped = std::clamp(value, -40.0f, 215.0f);
   int raw = static_cast<int>(std::lround(clamped));
   raw = std::clamp(raw, 0, 255);
+
+  if (virtual_panel_temp_number_ != nullptr)
+    virtual_panel_temp_number_->publish_state(static_cast<float>(raw));
+
+  if (!uart_heater_) {
+    ESP_LOGW("autoterm_uart", "Cannot send virtual panel temperature without heater UART");
+    return;
+  }
 
   std::vector<uint8_t> frame = {0xAA, 0x03, 0x01, 0x00, 0x11, static_cast<uint8_t>(raw)};
 

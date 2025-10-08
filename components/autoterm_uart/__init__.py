@@ -20,6 +20,9 @@ AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Num
 AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
 AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
 AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
+AutotermVirtualPanelTemperatureNumber = autoterm_ns.class_(
+    "AutotermVirtualPanelTemperatureNumber", number.Number
+)
 AutotermTemperatureSourceSelect = autoterm_ns.class_("AutotermTemperatureSourceSelect", select.Select)
 AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
 AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
@@ -71,6 +74,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_level_control"): number.number_schema(
         class_=AutotermPowerLevelNumber,
         icon="mdi:fan",
+    ),
+    cv.Optional("virtual_panel_temperature_control"): number.number_schema(
+        class_=AutotermVirtualPanelTemperatureNumber,
+        icon="mdi:thermometer",
     ),
     cv.Optional("temperature_source_control"): select.select_schema(
         class_=AutotermTemperatureSourceSelect,
@@ -173,6 +180,13 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_power_level_number(num))
+    if "virtual_panel_temperature_control" in config:
+        conf = config["virtual_panel_temperature_control"]
+        min_v = conf.get("min_value", 0)
+        max_v = conf.get("max_value", 40)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_virtual_panel_temp_number(num))
     if "temperature_source_control" in config:
         sel = await select.new_select(
             config["temperature_source_control"],

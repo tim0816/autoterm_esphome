@@ -103,6 +103,11 @@ autoterm_uart:
     name: "Arbeitszeit"
   power_level_control:
     name: "Leistungsstufe"
+  virtual_panel_temperature_control:
+    name: "Virtuelle Paneeltemperatur"
+    min_value: 0
+    max_value: 40
+    step: 1
   temperature_source_control:
     name: "Temperaturquelle"
   use_work_time_switch:

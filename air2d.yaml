@@ -49,7 +49,12 @@ uart:
     tx_pin: 23
     baud_rate: 9600
     rx_buffer_size: 1024
-sensor: 
+sensor:
+  # Beispiel: Temperatur aus Home Assistant als virtuelles Paneel-Feedback
+  - platform: homeassistant
+    entity_id: sensor.living_area_temperature
+    id: living_area_temperature
+    internal: true
 
 text_sensor:
 
@@ -106,6 +111,7 @@ autoterm_uart:
     name: "Wartebetrieb"
   display_connected:
     name: "Display Connected"
+  virtual_panel_temperature: living_area_temperature
 
   # --- Settings-Auswertung ---
   temperature_source:

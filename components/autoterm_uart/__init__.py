@@ -54,6 +54,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("wait_mode"): sensor.sensor_schema(icon="mdi:pause"),
     cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
     cv.Optional("display_connected"): binary_sensor.binary_sensor_schema(icon="mdi:monitor"),
+    cv.Optional("virtual_panel_temperature"): cv.use_id(sensor.Sensor),
 
     cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
@@ -126,6 +127,10 @@ async def to_code(config):
     if "display_connected" in config:
         bs = await binary_sensor.new_binary_sensor(config["display_connected"])
         cg.add(var.set_display_connected_sensor(bs))
+
+    if "virtual_panel_temperature" in config:
+        temp = await cg.get_variable(config["virtual_panel_temperature"])
+        cg.add(var.set_virtual_panel_temp_sensor(temp))
 
     if "power_on" in config:
         btn = await button.new_button(config["power_on"])

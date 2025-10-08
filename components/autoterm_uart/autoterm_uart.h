@@ -12,6 +12,8 @@
 #include <vector>
 #include <functional>
 #include <string>
+#include <algorithm>
+#include <cmath>
 
 namespace esphome {
 namespace autoterm_uart {
@@ -150,6 +152,7 @@ class AutotermUART : public Component {
   Sensor *use_work_time_sensor_{nullptr};
   text_sensor::TextSensor *status_text_sensor_{nullptr};
   binary_sensor::BinarySensor *display_connected_sensor_{nullptr};
+  Sensor *virtual_panel_temp_sensor_{nullptr};
 
 
   // Steuerobjekte
@@ -203,6 +206,15 @@ class AutotermUART : public Component {
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
   void set_display_connected_sensor(binary_sensor::BinarySensor *s) {
     display_connected_sensor_ = s;
+  }
+  void set_virtual_panel_temp_sensor(Sensor *s) {
+    virtual_panel_temp_sensor_ = s;
+    if (s != nullptr) {
+      s->add_on_state_callback([this](float value) { this->send_virtual_panel_temperature(value); });
+      if (s->has_state()) {
+        this->send_virtual_panel_temperature(s->state);
+      }
+    }
   }
 
 
@@ -267,7 +279,7 @@ class AutotermUART : public Component {
     }
 
     if (!connected) {
-      if (now - last_status_request_millis_ >= 1000) {
+      if (now - last_status_request_millis_ >= 2000) {
         send_status_request();
         last_status_request_millis_ = now;
       }
@@ -366,6 +378,7 @@ public:
   void update_settings_(const std::function<void(Settings &)> &updater);
   std::string temperature_source_to_string(uint8_t value) const;
   uint8_t temperature_source_from_string(const std::string &value) const;
+  void send_virtual_panel_temperature(float value);
 };
 
 // ===================
@@ -591,6 +604,40 @@ void AutotermUART::set_use_work_time(bool use) {
 
 void AutotermUART::set_wait_mode(bool on) {
   update_settings_([on](Settings &s) { s.wait_mode = on ? 1 : 2; });
+}
+
+void AutotermUART::send_virtual_panel_temperature(float value) {
+  if (!uart_heater_) {
+    ESP_LOGW("autoterm_uart", "Cannot send virtual panel temperature without heater UART");
+    return;
+  }
+
+  if (!std::isfinite(value)) {
+    ESP_LOGW("autoterm_uart", "Ignoring non-finite virtual panel temperature %.2f", value);
+    return;
+  }
+
+  float clamped = std::clamp(value, -40.0f, 215.0f);
+  int raw = static_cast<int>(std::lround(clamped));
+  raw = std::clamp(raw, 0, 255);
+
+  std::vector<uint8_t> frame = {0xAA, 0x03, 0x01, 0x00, 0x11, static_cast<uint8_t>(raw)};
+
+  uint16_t crc = 0xFFFF;
+  for (auto b : frame) {
+    crc ^= b;
+    for (int i = 0; i < 8; i++)
+      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  }
+  frame.push_back((crc >> 8) & 0xFF);
+  frame.push_back(crc & 0xFF);
+
+  uart_heater_->write_array(frame);
+  uart_heater_->flush();
+
+  ESP_LOGI("autoterm_uart",
+           "Sent virtual panel temperature %.2f°C (raw=%d, CRC %04X)",
+           value, raw, crc);
 }
 
 void AutotermUART::request_settings() {

@@ -8,8 +8,9 @@ esp32:
     type: arduino
 
 external_components:
-  - source: "./components"
+  - source: github://tim0816/autoterm_esphome
     components: [autoterm_uart]
+    refresh: 0s
 
 logger:
   level: DEBUG
@@ -88,11 +89,26 @@ autoterm_uart:
 
   power_off:
     name: "Autoterm Ausschalten"
+  power_on:
+    name: "Autoterm Einschalten"
 
   fan_mode:
     name: "Autoterm Lüften"
   fan_level:
     name: "Autoterm Lüfterstufe"
+
+  set_temperature_control:
+    name: "Autoterm Solltemperatur"
+  work_time_control:
+    name: "Autoterm Arbeitszeit"
+  power_level_control:
+    name: "Autoterm Leistungsstufe"
+  temperature_source_control:
+    name: "Autoterm Temperaturquelle"
+  use_work_time_switch:
+    name: "Autoterm Arbeitszeit verwenden"
+  wait_mode_switch:
+    name: "Autoterm Wartebetrieb"
 
   # --- Settings-Auswertung ---
   temperature_source:

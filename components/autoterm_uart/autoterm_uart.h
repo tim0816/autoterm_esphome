@@ -376,7 +376,7 @@ class AutotermUART : public Component {
           int total = 5 + len + 2;  // Header + Payload + CRC
           if (buffer.size() >= total) {
             if (validate_crc(buffer)) {
-              if (from_display && is_panel_temperature_frame_(buffer))
+              if (is_panel_temperature_frame_(buffer))
                 handle_panel_temperature_frame_(buffer);
               log_frame(tag, buffer);
               parse_status(buffer);

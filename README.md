@@ -140,22 +140,12 @@ autoterm-air2d/
 
 ---
 
-## ⚙️ Konfiguration anpassen
-
-- **Logger deaktivieren/umschalten:** Der UART-Logger wird deaktiviert (`baud_rate: 0`), um Kollisionen mit dem Heizungsbus zu vermeiden.
-- **Weboberfläche:** ESPHome-Webserver ist optional aktiv (`web_server`). Entfernen, falls nicht benötigt.
-- **Entitätsnamen:** Passe die `name:`-Felder im `autoterm_uart`-Block an deine Installation an.
-- **Grenzwerte:** Für Numbers werden sinnvolle Standardbereiche gesetzt, die bei Bedarf überschrieben werden können (z. B. `min_value`, `max_value`).
-- **Temperaturquelle:** Die Select-Entität akzeptiert nur die vier vordefinierten Optionen der Autoterm-Elektronik.
-
----
 
 ## 🛠️ Fehlerdiagnose & Logging
 
 - Jede empfangene Nachricht wird inkl. CRC geprüft und bei Erfolg als Hexdump geloggt – ideal zum Reverse Engineering.
 - Ungültige CRCs werden verworfen und als Warnung ausgegeben.
-- Beim Start fordert die Komponente automatisch die aktuellen Einstellungen an und veröffentlicht sie, sobald gültig.
-- Über Home Assistant lässt sich jederzeit kontrollieren, welche Werte zuletzt zur Heizung gesendet wurden (siehe Sensoren & Switches).
+
 
 ---
 

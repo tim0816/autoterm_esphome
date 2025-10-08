@@ -805,11 +805,15 @@ void AutotermUART::set_virtual_panel_override_enabled_(bool enabled) {
 }
 
 bool AutotermUART::is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const {
-  if (frame.size() < 6)
+  if (frame.size() < 8)
     return false;
   if (frame[0] != 0xAA)
     return false;
-  if (frame[1] != 0x03)
+  if (frame[1] != 0x03 && frame[1] != 0x04)
+    return false;
+  if (frame[2] != 0x01)
+    return false;
+  if (frame[3] != 0x00)
     return false;
   if (frame[4] != 0x11)
     return false;

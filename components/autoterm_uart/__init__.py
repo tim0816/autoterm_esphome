@@ -6,9 +6,10 @@ import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
 import esphome.components.switch as switch
+import esphome.components.select as select
 import esphome.components.button as button
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
@@ -18,10 +19,17 @@ AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Num
 AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
 AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
 AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
-AutotermTemperatureSourceNumber = autoterm_ns.class_("AutotermTemperatureSourceNumber", number.Number)
+AutotermTemperatureSourceSelect = autoterm_ns.class_("AutotermTemperatureSourceSelect", select.Select)
 AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
 AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
+
+TEMPERATURE_SOURCE_OPTIONS = [
+    "internal sensor",
+    "panel sensor",
+    "external sensor",
+    "no automatic temperature control",
+]
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AutotermUART),
@@ -61,8 +69,8 @@ CONFIG_SCHEMA = cv.Schema({
         class_=AutotermPowerLevelNumber,
         icon="mdi:fan",
     ),
-    cv.Optional("temperature_source_control"): number.number_schema(
-        class_=AutotermTemperatureSourceNumber,
+    cv.Optional("temperature_source_control"): select.select_schema(
+        class_=AutotermTemperatureSourceSelect,
         icon="mdi:thermometer",
     ),
     cv.Optional("use_work_time_switch"): switch.switch_schema(
@@ -155,12 +163,11 @@ async def to_code(config):
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_power_level_number(num))
     if "temperature_source_control" in config:
-        conf = config["temperature_source_control"]
-        min_v = conf.get("min_value", 1)
-        max_v = conf.get("max_value", 4)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_temperature_source_number(num))
+        sel = await select.new_select(
+            config["temperature_source_control"],
+            options=TEMPERATURE_SOURCE_OPTIONS,
+        )
+        cg.add(var.set_temperature_source_select(sel))
     if "use_work_time_switch" in config:
         sw = await switch.new_switch(config["use_work_time_switch"])
         cg.add(var.set_use_work_time_switch(sw))

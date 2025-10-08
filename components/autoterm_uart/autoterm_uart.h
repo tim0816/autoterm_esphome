@@ -56,15 +56,6 @@ class AutotermFanModeButton : public button::Button {
 // ===================
 // Custom Number Class
 // ===================
-class AutotermFanLevelNumber : public number::Number {
- public:
-  AutotermUART *parent_{nullptr};
-  void setup_parent(AutotermUART *p) { parent_ = p; }
-
- protected:
-  void control(float value) override;  // Implementierung folgt unten
-};
-
 class AutotermSetTemperatureNumber : public number::Number {
  public:
   AutotermUART *parent_{nullptr};
@@ -153,7 +144,6 @@ class AutotermUART : public Component {
   AutotermPowerOnButton *power_on_button_{nullptr};
   AutotermPowerOffButton *power_off_button_{nullptr};
   AutotermFanModeButton *fan_mode_button_{nullptr};
-  AutotermFanLevelNumber *fan_level_number_{nullptr};
   AutotermSetTemperatureNumber *set_temperature_number_{nullptr};
   AutotermWorkTimeNumber *work_time_number_{nullptr};
   AutotermPowerLevelNumber *power_level_number_{nullptr};
@@ -208,10 +198,6 @@ class AutotermUART : public Component {
   void set_fan_mode_button(AutotermFanModeButton *b) {
     fan_mode_button_ = b;
     if (b) b->setup_parent(this);
-  }
-  void set_fan_level_number(AutotermFanLevelNumber *n) {
-    fan_level_number_ = n;
-    if (n) n->setup_parent(this);
   }
   void set_set_temperature_number(AutotermSetTemperatureNumber *n) {
     set_temperature_number_ = n;
@@ -337,15 +323,9 @@ void AutotermPowerOnButton::press_action() {
 void AutotermFanModeButton::press_action() {
   ESP_LOGI("autoterm_uart", "Fan Mode button pressed");
   if (parent_) {
-    int level = parent_->fan_level_number_ ? (int)parent_->fan_level_number_->state : 8;
+    uint8_t level = parent_->settings_.power_level;
     parent_->send_fan_mode(true, level);
   }
-}
-
-// Number geändert → Level senden
-void AutotermFanLevelNumber::control(float value) {
-  publish_state(value);
-  if (parent_) parent_->send_fan_mode(true, (int)value);
 }
 
 void AutotermSetTemperatureNumber::control(float value) {

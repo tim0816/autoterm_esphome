@@ -15,7 +15,6 @@ autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
 AutotermPowerOffButton = autoterm_ns.class_("AutotermPowerOffButton", button.Button)
 AutotermFanModeButton = autoterm_ns.class_("AutotermFanModeButton", button.Button)
-AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
 AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
 AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
 AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
@@ -56,7 +55,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
     cv.Optional("fan_mode"): button.button_schema(class_=AutotermFanModeButton, icon="mdi:fan"),
-    cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
     cv.Optional("set_temperature_control"): number.number_schema(
         class_=AutotermSetTemperatureNumber,
         icon="mdi:thermometer",
@@ -133,14 +131,6 @@ async def to_code(config):
         btn = await button.new_button(config["fan_mode"])
         cg.add(var.set_fan_mode_button(btn))
 
-    if "fan_level" in config:
-        conf = config["fan_level"]
-        # Standardwerte definieren, falls nicht im YAML angegeben
-        min_v = conf.get("min_value", 0)
-        max_v = conf.get("max_value", 9)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_fan_level_number(num))
     if "set_temperature_control" in config:
         conf = config["set_temperature_control"]
         min_v = conf.get("min_value", 0)

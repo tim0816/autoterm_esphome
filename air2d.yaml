@@ -94,8 +94,6 @@ autoterm_uart:
 
   fan_mode:
     name: "Autoterm Lüften"
-  fan_level:
-    name: "Autoterm Lüfterstufe"
 
   set_temperature_control:
     name: "Autoterm Solltemperatur"

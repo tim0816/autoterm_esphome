@@ -1,0 +1,111 @@
+esphome:
+  name: air2d
+  friendly_name: Diesel-Heater
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: "./components"
+    components: [autoterm_uart]
+
+logger:
+  level: DEBUG
+  baud_rate: 0  # verhindert Konflikt mit UART
+
+# Enable Home Assistant API
+api:
+
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_VanPi_ssid
+  password: !secret wifi_VanPi_password
+  domain: !secret domain
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Dieselheater Hotspot"
+
+web_server:
+  port: 80
+
+captive_portal:
+  
+uart:
+  - id: uart_display          # Verbindung zum Bedienteil
+    rx_pin: 16
+    tx_pin: 17
+    baud_rate: 9600
+    rx_buffer_size: 1024
+
+  - id: uart_heater           # Verbindung zur Heizung
+    rx_pin: 22
+    tx_pin: 23
+    baud_rate: 9600
+    rx_buffer_size: 1024
+sensor: 
+
+text_sensor:
+
+switch:
+
+number:
+
+button:
+
+autoterm_uart:
+  uart_display_id: uart_display
+  uart_heater_id: uart_heater
+  internal_temp:
+    name: "Autoterm Internal Temperature"
+  external_temp:
+    name: "Autoterm External Temperature"
+  heater_temp:
+    name: "Autoterm Heater Temperature"
+  voltage:
+    name: "Autoterm Voltage"
+    accuracy_decimals: 1
+  status:
+    name: "Autoterm Status"
+  status_text:
+    name: "Autoterm Status Text"
+  fan_speed_set:
+    name: "Autoterm Fan RPM Set"
+    unit_of_measurement: "rpm"
+
+  fan_speed_actual:
+    name: "Autoterm Fan RPM Actual"
+    unit_of_measurement: "rpm"
+
+  pump_frequency:
+    name: "Autoterm Pump Frequency"
+    unit_of_measurement: "Hz"
+
+  power_off:
+    name: "Autoterm Ausschalten"
+
+  fan_mode:
+    name: "Autoterm Lüften"
+  fan_level:
+    name: "Autoterm Lüfterstufe"
+
+  # --- Settings-Auswertung ---
+  temperature_source:
+    name: "Autoterm Temperature Source"
+  set_temperature:
+    name: "Autoterm Set Temperature"
+    unit_of_measurement: "°C"
+  work_time:
+    name: "Autoterm Work Time"
+    unit_of_measurement: "min"
+  power_level:
+    name: "Autoterm Power Level"
+  wait_mode:
+    name: "Autoterm Wait Mode"
+  use_work_time:
+    name: "Autoterm Use Work Time"

@@ -24,6 +24,13 @@ AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", swit
 AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
 
+TEMPERATURE_SOURCE_OPTIONS = [
+    "internal sensor",
+    "panel sensor",
+    "external sensor",
+    "no automatic temperature control",
+]
+
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AutotermUART),
     cv.Required("uart_display_id"): cv.use_id(uart.UARTComponent),
@@ -156,7 +163,10 @@ async def to_code(config):
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_power_level_number(num))
     if "temperature_source_control" in config:
-        sel = await select.new_select(config["temperature_source_control"])
+        sel = await select.new_select(
+            config["temperature_source_control"],
+            options=TEMPERATURE_SOURCE_OPTIONS,
+        )
         cg.add(var.set_temperature_source_select(sel))
     if "use_work_time_switch" in config:
         sw = await switch.new_switch(config["use_work_time_switch"])

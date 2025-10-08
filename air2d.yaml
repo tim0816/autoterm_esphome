@@ -1,6 +1,6 @@
 esphome:
   name: air2d
-  friendly_name: Diesel-Heater
+  friendly_name: Autotherm Air2D
 
 esp32:
   board: esp32dev
@@ -59,69 +59,70 @@ number:
 
 button:
 
+select:
+
 autoterm_uart:
   uart_display_id: uart_display
   uart_heater_id: uart_heater
   internal_temp:
-    name: "Autoterm Internal Temperature"
+    name: "Internal Temperature"
   external_temp:
-    name: "Autoterm External Temperature"
+    name: "External Temperature"
   heater_temp:
-    name: "Autoterm Heater Temperature"
+    name: "Heater Temperature"
   voltage:
-    name: "Autoterm Voltage"
+    name: "Voltage"
     accuracy_decimals: 1
   status:
-    name: "Autoterm Status"
+    name: "Status"
   status_text:
-    name: "Autoterm Status Text"
+    name: "Status Text"
   fan_speed_set:
-    name: "Autoterm Fan RPM Set"
+    name: "Fan RPM Set"
     unit_of_measurement: "rpm"
 
   fan_speed_actual:
-    name: "Autoterm Fan RPM Actual"
+    name: "Fan RPM Actual"
     unit_of_measurement: "rpm"
 
   pump_frequency:
-    name: "Autoterm Pump Frequency"
+    name: "Pump Frequency"
     unit_of_measurement: "Hz"
 
   power_off:
-    name: "Autoterm Ausschalten"
+    name: "Ausschalten"
   power_on:
-    name: "Autoterm Einschalten"
+    name: "Einschalten"
 
   fan_mode:
-    name: "Autoterm Lüften"
-  fan_level:
-    name: "Autoterm Lüfterstufe"
+    name: "Lüften"
+
 
   set_temperature_control:
-    name: "Autoterm Solltemperatur"
+    name: "Solltemperatur"
   work_time_control:
-    name: "Autoterm Arbeitszeit"
+    name: "Arbeitszeit"
   power_level_control:
-    name: "Autoterm Leistungsstufe"
+    name: "Leistungsstufe"
   temperature_source_control:
-    name: "Autoterm Temperaturquelle"
+    name: "Temperaturquelle"
   use_work_time_switch:
-    name: "Autoterm Arbeitszeit verwenden"
+    name: "Arbeitszeit verwenden"
   wait_mode_switch:
-    name: "Autoterm Wartebetrieb"
+    name: "Wartebetrieb"
 
   # --- Settings-Auswertung ---
   temperature_source:
-    name: "Autoterm Temperature Source"
+    name: "Temperature Source"
   set_temperature:
-    name: "Autoterm Set Temperature"
+    name: "Set Temperature"
     unit_of_measurement: "°C"
   work_time:
-    name: "Autoterm Work Time"
+    name: "Work Time"
     unit_of_measurement: "min"
   power_level:
-    name: "Autoterm Power Level"
+    name: "Power Level"
   wait_mode:
-    name: "Autoterm Wait Mode"
+    name: "Wait Mode"
   use_work_time:
-    name: "Autoterm Use Work Time"
+    name: "Use Work Time"

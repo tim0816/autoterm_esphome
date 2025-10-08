@@ -600,6 +600,9 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
     case 0x0101:
       status_txt = "ventilation";
       break;
+   case 0x0200:
+      status_txt = "prepare heating";
+      break;
     case 0x0201:
       status_txt = "heating glow plug";
       break;

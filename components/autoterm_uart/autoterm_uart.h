@@ -95,9 +95,11 @@ class AutotermPowerLevelNumber : public number::Number {
 class AutotermTemperatureSourceSelect : public select::Select {
  public:
   AutotermUART *parent_{nullptr};
+  AutotermTemperatureSourceSelect() {
+    this->traits.set_options({"internal sensor", "panel sensor", "external sensor",
+                              "no automatic temperature control"});
+  }
   void setup_parent(AutotermUART *p) { parent_ = p; }
-
-  select::SelectTraits get_traits() override;
 
  protected:
   void control(const std::string &value) override;

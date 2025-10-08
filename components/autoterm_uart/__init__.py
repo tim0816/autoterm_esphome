@@ -10,6 +10,7 @@ import esphome.components.button as button
 DEPENDENCIES = ["sensor", "text_sensor", "number", "button"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
+AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
 AutotermPowerOffButton = autoterm_ns.class_("AutotermPowerOffButton", button.Button)
 AutotermFanModeButton = autoterm_ns.class_("AutotermFanModeButton", button.Button)
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
@@ -37,6 +38,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("wait_mode"): sensor.sensor_schema(icon="mdi:pause"),
     cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
 
+    cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
     cv.Optional("fan_mode"): button.button_schema(class_=AutotermFanModeButton, icon="mdi:fan"),
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
@@ -79,6 +81,10 @@ async def to_code(config):
         if key in config:
             txt = await text_sensor.new_text_sensor(config[key])
             cg.add(getattr(var, setter)(txt))
+
+    if "power_on" in config:
+        btn = await button.new_button(config["power_on"])
+        cg.add(var.set_power_on_button(btn))
 
     if "power_off" in config:
         btn = await button.new_button(config["power_off"])

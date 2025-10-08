@@ -30,8 +30,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("pump_frequency"): sensor.sensor_schema(unit_of_measurement="Hz", icon="mdi:water-pump"),
 
     cv.Optional("status_text"): text_sensor.text_sensor_schema(icon="mdi:information"),
-
-    cv.Optional("temperature_source"): sensor.sensor_schema(icon="mdi:thermometer"),
+    cv.Optional("temperature_source"): text_sensor.text_sensor_schema(icon="mdi:thermometer"),
     cv.Optional("set_temperature"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("work_time"): sensor.sensor_schema(unit_of_measurement="min", icon="mdi:clock-outline"),
     cv.Optional("power_level"): sensor.sensor_schema(icon="mdi:fan"),
@@ -63,7 +62,6 @@ async def to_code(config):
         ("fan_speed_set", "set_fan_speed_set_sensor"),
         ("fan_speed_actual", "set_fan_speed_actual_sensor"),
         ("pump_frequency", "set_pump_frequency_sensor"),
-        ("temperature_source", "set_temperature_source_sensor"),
         ("set_temperature", "set_set_temperature_sensor"),
         ("work_time", "set_work_time_sensor"),
         ("power_level", "set_power_level_sensor"),
@@ -74,9 +72,13 @@ async def to_code(config):
             sens = await sensor.new_sensor(config[key])
             cg.add(getattr(var, setter)(sens))
 
-    if "status_text" in config:
-        txt = await text_sensor.new_text_sensor(config["status_text"])
-        cg.add(var.set_status_text_sensor(txt))
+    for key, setter in [
+        ("status_text", "set_status_text_sensor"),
+        ("temperature_source", "set_temperature_source_text_sensor"),
+    ]:
+        if key in config:
+            txt = await text_sensor.new_text_sensor(config[key])
+            cg.add(getattr(var, setter)(txt))
 
     if "power_off" in config:
         btn = await button.new_button(config["power_off"])

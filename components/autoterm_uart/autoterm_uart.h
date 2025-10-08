@@ -69,7 +69,7 @@ class AutotermUART : public Component {
   Sensor *fan_speed_set_sensor_{nullptr};
   Sensor *fan_speed_actual_sensor_{nullptr};
   Sensor *pump_frequency_sensor_{nullptr};
-  Sensor *temperature_source_sensor_{nullptr};
+  text_sensor::TextSensor *temperature_source_text_sensor_{nullptr};
   Sensor *set_temperature_sensor_{nullptr};
   Sensor *work_time_sensor_{nullptr};
   Sensor *power_level_sensor_{nullptr};
@@ -96,7 +96,9 @@ class AutotermUART : public Component {
   void set_fan_speed_set_sensor(Sensor *s) { fan_speed_set_sensor_ = s; }
   void set_fan_speed_actual_sensor(Sensor *s) { fan_speed_actual_sensor_ = s; }
   void set_pump_frequency_sensor(Sensor *s) { pump_frequency_sensor_ = s; }
-  void set_temperature_source_sensor(Sensor *s) { temperature_source_sensor_ = s; }
+  void set_temperature_source_text_sensor(text_sensor::TextSensor *s) {
+    temperature_source_text_sensor_ = s;
+  }
   void set_set_temperature_sensor(Sensor *s) { set_temperature_sensor_ = s; }
   void set_work_time_sensor(Sensor *s) { work_time_sensor_ = s; }
   void set_power_level_sensor(Sensor *s) { power_level_sensor_ = s; }
@@ -301,7 +303,26 @@ void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
 
     if (use_work_time_sensor_) use_work_time_sensor_->publish_state(use_work_time);
     if (work_time_sensor_) work_time_sensor_->publish_state(work_time);
-    if (temperature_source_sensor_) temperature_source_sensor_->publish_state(temp_source);
+    if (temperature_source_text_sensor_) {
+      const char *temp_source_txt = "unknown";
+      switch (temp_source) {
+        case 1:
+          temp_source_txt = "internal sensor";
+          break;
+        case 2:
+          temp_source_txt = "panel sensor";
+          break;
+        case 3:
+          temp_source_txt = "external sensor";
+          break;
+        case 4:
+          temp_source_txt = "no automatic temperature control";
+          break;
+        default:
+          break;
+      }
+      temperature_source_text_sensor_->publish_state(temp_source_txt);
+    }
     if (set_temperature_sensor_) set_temperature_sensor_->publish_state(set_temp);
     if (wait_mode_sensor_) wait_mode_sensor_->publish_state(wait_mode);
     if (power_level_sensor_) power_level_sensor_->publish_state(power_level);

@@ -3,7 +3,6 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/switch/switch.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/button/button.h"
 #include <vector>
@@ -30,15 +29,15 @@ class AutotermPowerOffButton : public button::Button {
  
 
 // ===================
-// Custom Switch Class
+// Custom Button Class (Lüften)
 // ===================
-class AutotermFanModeSwitch : public switch_::Switch {
+class AutotermFanModeButton : public button::Button {
  public:
   AutotermUART *parent_{nullptr};
   void setup_parent(AutotermUART *p) { parent_ = p; }
 
  protected:
-  void write_state(bool state) override;  // Implementierung folgt unten
+  void press_action() override;
 };
 
 // ===================
@@ -81,7 +80,7 @@ class AutotermUART : public Component {
 
   // Steuerobjekte
   AutotermPowerOffButton *power_off_button_{nullptr};
-  AutotermFanModeSwitch *fan_mode_switch_{nullptr};
+  AutotermFanModeButton *fan_mode_button_{nullptr};
   AutotermFanLevelNumber *fan_level_number_{nullptr};
 
   void send_power_off();
@@ -111,9 +110,9 @@ class AutotermUART : public Component {
     power_off_button_ = b;
     if (b) b->setup_parent(this);
   }
-  void set_fan_mode_switch(AutotermFanModeSwitch *s) {
-    fan_mode_switch_ = s;
-    if (s) s->setup_parent(this);
+  void set_fan_mode_button(AutotermFanModeButton *b) {
+    fan_mode_button_ = b;
+    if (b) b->setup_parent(this);
   }
   void set_fan_level_number(AutotermFanLevelNumber *n) {
     fan_level_number_ = n;
@@ -193,12 +192,12 @@ public:
 // Methodenimplementierungen
 // ===================
 
-// Switch gedrückt → Fan Mode senden
-void AutotermFanModeSwitch::write_state(bool state) {
-  publish_state(state);
+// Button gedrückt → Lüften aktivieren
+void AutotermFanModeButton::press_action() {
+  ESP_LOGI("autoterm_uart", "Fan Mode button pressed");
   if (parent_) {
     int level = parent_->fan_level_number_ ? (int)parent_->fan_level_number_->state : 8;
-    parent_->send_fan_mode(state, level);
+    parent_->send_fan_mode(true, level);
   }
 }
 

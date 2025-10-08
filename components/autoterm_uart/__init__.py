@@ -39,13 +39,31 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("external_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("heater_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("voltage"): sensor.sensor_schema(unit_of_measurement="V", icon="mdi:flash"),
-    cv.Optional("status"): sensor.sensor_schema(icon="mdi:information"),
-    cv.Optional("fan_speed_set"): sensor.sensor_schema(unit_of_measurement="rpm", icon="mdi:fan"),
-    cv.Optional("fan_speed_actual"): sensor.sensor_schema(unit_of_measurement="rpm", icon="mdi:fan"),
-    cv.Optional("pump_frequency"): sensor.sensor_schema(unit_of_measurement="Hz", icon="mdi:water-pump"),
+    cv.Optional("status"): sensor.sensor_schema(
+        icon="mdi:information",
+        entity_category=const.ENTITY_CATEGORY_DIAGNOSTIC,
+    ),
+    cv.Optional("fan_speed_set"): sensor.sensor_schema(
+        unit_of_measurement="rpm",
+        icon="mdi:fan",
+        entity_category=const.ENTITY_CATEGORY_DIAGNOSTIC,
+    ),
+    cv.Optional("fan_speed_actual"): sensor.sensor_schema(
+        unit_of_measurement="rpm",
+        icon="mdi:fan",
+        entity_category=const.ENTITY_CATEGORY_DIAGNOSTIC,
+    ),
+    cv.Optional("pump_frequency"): sensor.sensor_schema(
+        unit_of_measurement="Hz",
+        icon="mdi:water-pump",
+        entity_category=const.ENTITY_CATEGORY_DIAGNOSTIC,
+    ),
 
     cv.Optional("status_text"): text_sensor.text_sensor_schema(icon="mdi:information"),
-    cv.Optional("temperature_source"): text_sensor.text_sensor_schema(icon="mdi:thermometer"),
+    cv.Optional("temperature_source"): text_sensor.text_sensor_schema(
+        icon="mdi:thermometer",
+        entity_category=const.ENTITY_CATEGORY_DIAGNOSTIC,
+    ),
     cv.Optional("set_temperature"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("work_time"): sensor.sensor_schema(unit_of_measurement="min", icon="mdi:clock-outline"),
     cv.Optional("power_level"): sensor.sensor_schema(icon="mdi:fan"),

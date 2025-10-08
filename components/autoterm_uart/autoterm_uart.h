@@ -241,6 +241,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   else if (status_val == 3.35f) status_txt = "only fan";
   else if (status_val == 3.4f) status_txt = "cooling down";
   else if (status_val == 4.0f) status_txt = "shutting down";
+  else if (status_val == 6.5f) status_txt = "only fan";
 
   ESP_LOGI("autoterm_uart",
            "Status: %s | U=%.1fV | Heater %.0f°C | Fan %.0f/%.0f rpm | Pump %.2f Hz",

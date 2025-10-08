@@ -4,15 +4,14 @@ from esphome import const
 import esphome.components.uart as uart
 import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
-import esphome.components.switch as switch
 import esphome.components.number as number
 import esphome.components.button as button
 
-DEPENDENCIES = ["sensor", "text_sensor", "switch", "number", "button"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "button"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOffButton = autoterm_ns.class_("AutotermPowerOffButton", button.Button)
-AutotermFanModeSwitch = autoterm_ns.class_("AutotermFanModeSwitch", switch.Switch)
+AutotermFanModeButton = autoterm_ns.class_("AutotermFanModeButton", button.Button)
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
 
@@ -40,7 +39,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
 
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
-    cv.Optional("fan_mode"): switch.switch_schema(class_=AutotermFanModeSwitch, icon="mdi:fan"),
+    cv.Optional("fan_mode"): button.button_schema(class_=AutotermFanModeButton, icon="mdi:fan"),
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
 
 
@@ -84,8 +83,8 @@ async def to_code(config):
         cg.add(var.set_power_off_button(btn))
 
     if "fan_mode" in config:
-        sw = await switch.new_switch(config["fan_mode"])
-        cg.add(var.set_fan_mode_switch(sw))
+        btn = await button.new_button(config["fan_mode"])
+        cg.add(var.set_fan_mode_button(btn))
 
     if "fan_level" in config:
         conf = config["fan_level"]

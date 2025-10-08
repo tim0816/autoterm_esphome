@@ -625,6 +625,10 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
       status_txt = "shutting down";
       break;
     default:
+      // Wenn unbekannter Status, erweitere Textausgabe um HEX-Werte
+      static char unknown_buf[32];
+      snprintf(unknown_buf, sizeof(unknown_buf), "unknown (0x%02X%02X)", s_hi, s_lo);
+      status_txt = unknown_buf;
       break;
   }
 

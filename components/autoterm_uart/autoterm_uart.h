@@ -462,7 +462,7 @@ class AutotermUART : public Component {
       sprintf(temp, "%02X ", v);
       hex += temp;
     }
-    ESP_LOGI("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
+    ESP_LOGD("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
   }
 
   void parse_status(const std::vector<uint8_t> &data);
@@ -849,7 +849,7 @@ void AutotermUART::request_settings() {
   uart_heater_->write_array(frame);
   uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart", "Requested settings (CRC %04X)", crc);
+  ESP_LOGD("autoterm_uart", "Requested settings (CRC %04X)", crc);
   last_settings_request_millis_ = millis();
 }
 
@@ -900,7 +900,7 @@ void AutotermUART::send_settings(const Settings &settings) {
   uart_heater_->write_array(frame);
   uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart",
+  ESP_LOGD("autoterm_uart",
            "Sent settings: use_work_time=%u work_time=%u temp_src=%u set_temp=%u wait_mode=%u level=%u (CRC %04X)",
            settings.use_work_time, settings.work_time, settings.temperature_source,
            settings.set_temperature, settings.wait_mode, settings.power_level, crc);
@@ -994,7 +994,7 @@ void AutotermUART::send_power_off() {
   this->uart_heater_->write_array(frame);
   this->uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart", "Sent Power OFF command (CRC %04X)", crc);
+  ESP_LOGD("autoterm_uart", "Sent Power OFF command (CRC %04X)", crc);
 }
 
 void AutotermUART::send_power_on() {
@@ -1018,7 +1018,7 @@ void AutotermUART::send_power_on() {
   this->uart_heater_->write_array(frame);
   this->uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart", "Sent Power ON command (CRC %04X)", crc);
+  ESP_LOGD("autoterm_uart", "Sent Power ON command (CRC %04X)", crc);
 }
 
 

@@ -97,6 +97,8 @@ class AutotermTemperatureSourceSelect : public select::Select {
   AutotermUART *parent_{nullptr};
   void setup_parent(AutotermUART *p) { parent_ = p; }
 
+  select::SelectTraits get_traits() override;
+
  protected:
   void control(const std::string &value) override;
 };

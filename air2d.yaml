@@ -49,17 +49,16 @@ uart:
     tx_pin: 23
     baud_rate: 9600
     rx_buffer_size: 1024
-sensor: 
+sensor:
+  # Beispiel: Temperatur aus Home Assistant als virtuelles Paneel-Feedback
+  - platform: homeassistant
+    entity_id: sensor.living_area_temperature
+    id: living_area_temperature
+    internal: true
 
 text_sensor:
 
 switch:
-
-number:
-
-button:
-
-select:
 
 autoterm_uart:
   uart_display_id: uart_display
@@ -70,6 +69,8 @@ autoterm_uart:
     name: "External Temperature"
   heater_temp:
     name: "Heater Temperature"
+  panel_temp:
+    name: "Panel Temperature"
   voltage:
     name: "Voltage"
     accuracy_decimals: 1
@@ -104,12 +105,22 @@ autoterm_uart:
     name: "Arbeitszeit"
   power_level_control:
     name: "Leistungsstufe"
+  virtual_panel_temperature_control:
+    name: "Virtuelle Paneeltemperatur"
+    min_value: 0
+    max_value: 40
+    step: 1
+  virtual_panel_override_switch:
+    name: "Virtuelle Paneeltemperatur verwenden"
   temperature_source_control:
     name: "Temperaturquelle"
   use_work_time_switch:
     name: "Arbeitszeit verwenden"
   wait_mode_switch:
     name: "Wartebetrieb"
+  display_connected:
+    name: "Display Connected"
+  virtual_panel_temperature: living_area_temperature
 
   # --- Settings-Auswertung ---
   temperature_source:

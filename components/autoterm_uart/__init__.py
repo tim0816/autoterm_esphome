@@ -8,8 +8,9 @@ import esphome.components.number as number
 import esphome.components.switch as switch
 import esphome.components.select as select
 import esphome.components.button as button
+import esphome.components.binary_sensor as binary_sensor
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select", "binary_sensor"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
@@ -19,6 +20,12 @@ AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Num
 AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
 AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
 AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
+AutotermVirtualPanelTemperatureNumber = autoterm_ns.class_(
+    "AutotermVirtualPanelTemperatureNumber", number.Number
+)
+AutotermVirtualPanelOverrideSwitch = autoterm_ns.class_(
+    "AutotermVirtualPanelOverrideSwitch", switch.Switch
+)
 AutotermTemperatureSourceSelect = autoterm_ns.class_("AutotermTemperatureSourceSelect", select.Select)
 AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
 AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
@@ -39,6 +46,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("internal_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("external_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("heater_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
+    cv.Optional("panel_temp"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
     cv.Optional("voltage"): sensor.sensor_schema(unit_of_measurement="V", icon="mdi:flash"),
     cv.Optional("status"): sensor.sensor_schema(icon="mdi:information"),
     cv.Optional("fan_speed_set"): sensor.sensor_schema(unit_of_measurement="rpm", icon="mdi:fan"),
@@ -52,6 +60,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_level"): sensor.sensor_schema(icon="mdi:fan"),
     cv.Optional("wait_mode"): sensor.sensor_schema(icon="mdi:pause"),
     cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
+    cv.Optional("display_connected"): binary_sensor.binary_sensor_schema(icon="mdi:monitor"),
+    cv.Optional("virtual_panel_temperature"): cv.use_id(sensor.Sensor),
 
     cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
@@ -68,6 +78,14 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_level_control"): number.number_schema(
         class_=AutotermPowerLevelNumber,
         icon="mdi:fan",
+    ),
+    cv.Optional("virtual_panel_temperature_control"): number.number_schema(
+        class_=AutotermVirtualPanelTemperatureNumber,
+        icon="mdi:thermometer",
+    ),
+    cv.Optional("virtual_panel_override_switch"): switch.switch_schema(
+        class_=AutotermVirtualPanelOverrideSwitch,
+        icon="mdi:swap-horizontal",
     ),
     cv.Optional("temperature_source_control"): select.select_schema(
         class_=AutotermTemperatureSourceSelect,
@@ -98,6 +116,7 @@ async def to_code(config):
         ("internal_temp", "set_internal_temp_sensor"),
         ("external_temp", "set_external_temp_sensor"),
         ("heater_temp", "set_heater_temp_sensor"),
+        ("panel_temp", "set_panel_temp_sensor"),
         ("voltage", "set_voltage_sensor"),
         ("status", "set_status_sensor"),
         ("fan_speed_set", "set_fan_speed_set_sensor"),
@@ -120,6 +139,14 @@ async def to_code(config):
         if key in config:
             txt = await text_sensor.new_text_sensor(config[key])
             cg.add(getattr(var, setter)(txt))
+
+    if "display_connected" in config:
+        bs = await binary_sensor.new_binary_sensor(config["display_connected"])
+        cg.add(var.set_display_connected_sensor(bs))
+
+    if "virtual_panel_temperature" in config:
+        temp = await cg.get_variable(config["virtual_panel_temperature"])
+        cg.add(var.set_virtual_panel_temp_sensor(temp))
 
     if "power_on" in config:
         btn = await button.new_button(config["power_on"])
@@ -162,6 +189,16 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_power_level_number(num))
+    if "virtual_panel_temperature_control" in config:
+        conf = config["virtual_panel_temperature_control"]
+        min_v = conf.get("min_value", 0)
+        max_v = conf.get("max_value", 40)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_virtual_panel_temp_number(num))
+    if "virtual_panel_override_switch" in config:
+        sw = await switch.new_switch(config["virtual_panel_override_switch"])
+        cg.add(var.set_virtual_panel_override_switch(sw))
     if "temperature_source_control" in config:
         sel = await select.new_select(
             config["temperature_source_control"],

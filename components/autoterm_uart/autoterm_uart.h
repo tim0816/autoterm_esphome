@@ -1005,13 +1005,8 @@ void AutotermUART::send_power_on() {
   if (!this->uart_heater_) return;
 
   const uint8_t header[] = {0xAA, 0x03, 0x06, 0x00, 0x01};
-  //const uint8_t payload[] = {0x01, 0x00, 0x04, 0x10, 0x00, settings.power_level};
-  uint8_t payload[6] = {settings.use_work_time,
-                        settings.work_time,
-                        settings.temperature_source,
-                        settings.set_temperature,
-                        settings.wait_mode,
-                        settings.power_level};
+  const uint8_t payload[] = {0x01, 0x00, 0x04, 0x10, 0x00, 0x08};
+
 
   std::vector<uint8_t> frame(header, header + 5);
   frame.insert(frame.end(), payload, payload + sizeof(payload));

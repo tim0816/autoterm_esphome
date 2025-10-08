@@ -265,9 +265,6 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
     case 0x0400:
       status_txt = "shutting down";
       break;
-    case 0x0605:
-      status_txt = "only fan";
-      break;
     default:
       break;
   }

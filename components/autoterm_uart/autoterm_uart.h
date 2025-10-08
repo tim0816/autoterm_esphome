@@ -140,6 +140,7 @@ class AutotermWaitModeSwitch : public esphome::switch_::Switch {
 // Hauptklasse UART
 // ===================
 class AutotermUART : public Component {
+  friend class AutotermVirtualPanelTemperatureNumber;
  public:
   UARTComponent *uart_display_{nullptr};
   UARTComponent *uart_heater_{nullptr};

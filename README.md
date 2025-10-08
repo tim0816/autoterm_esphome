@@ -27,7 +27,7 @@ und stellt alle Werte als Sensoren, Schalter, Buttons und Nummern in Home Assist
 |:--|:--|
 | 🔍 **Statusauswertung** | Liest regelmäßig Heizungstemperatur, Spannung, interne/externe Sensorwerte, Lüfterdrehzahl, Pumpenfrequenz, Betriebsstatus |
 | 🧭 **Settings** | Liest aktuelle Einstellungen (Temperaturquelle, Solltemperatur, Arbeitszeit, Leistungsstufe, etc.) |
-| 🌀 **Lüftersteuerung** | Aktiviert den Lüftermodus („only fan“) und ändert die Lüfterstufe (0–9) |
+| 🌀 **Lüftersteuerung** | Aktiviert den Lüftermodus („only fan“) und nutzt die aktuell konfigurierte Leistungsstufe |
 | ⛔ **Ausschalten** | Schaltet Heizung oder Lüfter komplett aus (`0x03`) |
 | 🧾 **Protokoll-CRC** | CRC16 (Modbus) Validierung sämtlicher Frames |
 | 🪄 **Bridge-Funktion** | UART-Forwarding zwischen Display ↔ Heizung, ESP „snifft“ passiv mit |
@@ -93,11 +93,12 @@ autoterm-air2d/
 | `sensor.autoterm_heater_temperature` | Heizungstemperatur |
 | `sensor.autoterm_internal_temperature` | Interner Temperatursensor |
 | `sensor.autoterm_external_temperature` | Externer Temperatursensor |
-| `sensor.autoterm_fan_rpm_set` | Soll-Drehzahl |
-| `sensor.autoterm_fan_rpm_actual` | Ist-Drehzahl |
-| `sensor.autoterm_pump_frequency` | Pumpenfrequenz |
-| `sensor.autoterm_status` | Statuscode (z. B. 3.0) |
+| `sensor.autoterm_fan_rpm_set` | Soll-Drehzahl *(Diagnostic Entity)* |
+| `sensor.autoterm_fan_rpm_actual` | Ist-Drehzahl *(Diagnostic Entity)* |
+| `sensor.autoterm_pump_frequency` | Pumpenfrequenz *(Diagnostic Entity)* |
+| `sensor.autoterm_status` | Statuscode (z. B. 3.0) *(Diagnostic Entity)* |
 | `text_sensor.autoterm_status_text` | Statusbeschreibung (z. B. „heating“) |
+| `text_sensor.autoterm_temperature_source` | Temperaturquelle *(Diagnostic Entity)* |
 
 ---
 
@@ -109,6 +110,7 @@ autoterm-air2d/
 | `number.autoterm_luefterstufe` | Number | Lüfterstufe 0–9 |
 | `button.autoterm_ausschalten` | Button | Heizung/Lüfter ausschalten (`0x03`) |
 | *(optional)* `button.autoterm_starten` | Button | Heizung starten (`0x01`) |
+| `button.autoterm_lueften` | Button | Lüften mit aktueller Leistungsstufe starten |
 
 ---
 

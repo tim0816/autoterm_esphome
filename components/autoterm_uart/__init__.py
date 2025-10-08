@@ -23,6 +23,9 @@ AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number
 AutotermVirtualPanelTemperatureNumber = autoterm_ns.class_(
     "AutotermVirtualPanelTemperatureNumber", number.Number
 )
+AutotermVirtualPanelOverrideSwitch = autoterm_ns.class_(
+    "AutotermVirtualPanelOverrideSwitch", switch.Switch
+)
 AutotermTemperatureSourceSelect = autoterm_ns.class_("AutotermTemperatureSourceSelect", select.Select)
 AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
 AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
@@ -78,6 +81,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("virtual_panel_temperature_control"): number.number_schema(
         class_=AutotermVirtualPanelTemperatureNumber,
         icon="mdi:thermometer",
+    ),
+    cv.Optional("virtual_panel_override_switch"): switch.switch_schema(
+        class_=AutotermVirtualPanelOverrideSwitch,
+        icon="mdi:swap-horizontal",
     ),
     cv.Optional("temperature_source_control"): select.select_schema(
         class_=AutotermTemperatureSourceSelect,
@@ -187,6 +194,9 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_virtual_panel_temp_number(num))
+    if "virtual_panel_override_switch" in config:
+        sw = await switch.new_switch(config["virtual_panel_override_switch"])
+        cg.add(var.set_virtual_panel_override_switch(sw))
     if "temperature_source_control" in config:
         sel = await select.new_select(
             config["temperature_source_control"],

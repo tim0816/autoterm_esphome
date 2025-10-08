@@ -108,6 +108,8 @@ autoterm_uart:
     min_value: 0
     max_value: 40
     step: 1
+  virtual_panel_override_switch:
+    name: "Virtuelle Paneeltemperatur verwenden"
   temperature_source_control:
     name: "Temperaturquelle"
   use_work_time_switch:

@@ -6,6 +6,7 @@
 #include "esphome/components/number/number.h"
 #include "esphome/components/button/button.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/select/select.h"
 #include <vector>
 #include <functional>
 #include <string>
@@ -91,13 +92,13 @@ class AutotermPowerLevelNumber : public number::Number {
   void control(float value) override;
 };
 
-class AutotermTemperatureSourceNumber : public number::Number {
+class AutotermTemperatureSourceSelect : public select::Select {
  public:
   AutotermUART *parent_{nullptr};
   void setup_parent(AutotermUART *p) { parent_ = p; }
 
  protected:
-  void control(float value) override;
+  void control(const std::string &value) override;
 };
 
 class AutotermUseWorkTimeSwitch : public esphome::switch_::Switch {
@@ -152,7 +153,7 @@ class AutotermUART : public Component {
   AutotermSetTemperatureNumber *set_temperature_number_{nullptr};
   AutotermWorkTimeNumber *work_time_number_{nullptr};
   AutotermPowerLevelNumber *power_level_number_{nullptr};
-  AutotermTemperatureSourceNumber *temperature_source_number_{nullptr};
+  AutotermTemperatureSourceSelect *temperature_source_select_{nullptr};
   AutotermUseWorkTimeSwitch *use_work_time_switch_{nullptr};
   AutotermWaitModeSwitch *wait_mode_switch_{nullptr};
 
@@ -220,9 +221,9 @@ class AutotermUART : public Component {
     power_level_number_ = n;
     if (n) n->setup_parent(this);
   }
-  void set_temperature_source_number(AutotermTemperatureSourceNumber *n) {
-    temperature_source_number_ = n;
-    if (n) n->setup_parent(this);
+  void set_temperature_source_select(AutotermTemperatureSourceSelect *s) {
+    temperature_source_select_ = s;
+    if (s) s->setup_parent(this);
   }
   void set_use_work_time_switch(AutotermUseWorkTimeSwitch *s) {
     use_work_time_switch_ = s;
@@ -306,6 +307,7 @@ public:
   void set_work_time(uint8_t value);
   void set_power_level(uint8_t value);
   void set_temperature_source(uint8_t value);
+  bool set_temperature_source_from_string(const std::string &value);
   void set_use_work_time(bool use);
   void set_wait_mode(bool on);
 
@@ -315,6 +317,7 @@ public:
   void publish_settings_(const Settings &settings);
   void update_settings_(const std::function<void(Settings &)> &updater);
   std::string temperature_source_to_string(uint8_t value) const;
+  uint8_t temperature_source_from_string(const std::string &value) const;
 };
 
 // ===================
@@ -356,9 +359,15 @@ void AutotermPowerLevelNumber::control(float value) {
   if (parent_) parent_->set_power_level(static_cast<uint8_t>(value));
 }
 
-void AutotermTemperatureSourceNumber::control(float value) {
-  publish_state(value);
-  if (parent_) parent_->set_temperature_source(static_cast<uint8_t>(value));
+void AutotermTemperatureSourceSelect::control(const std::string &value) {
+  if (parent_ == nullptr) {
+    ESP_LOGW("autoterm_uart", "Temperature source select has no parent");
+    return;
+  }
+
+  if (parent_->set_temperature_source_from_string(value)) {
+    publish_state(value);
+  }
 }
 
 void AutotermUseWorkTimeSwitch::write_state(bool state) {
@@ -517,6 +526,17 @@ void AutotermUART::set_temperature_source(uint8_t value) {
   update_settings_([value](Settings &s) { s.temperature_source = value; });
 }
 
+bool AutotermUART::set_temperature_source_from_string(const std::string &value) {
+  uint8_t numeric_value = temperature_source_from_string(value);
+  if (numeric_value == 0) {
+    ESP_LOGW("autoterm_uart", "Unknown temperature source option: %s", value.c_str());
+    return false;
+  }
+
+  set_temperature_source(numeric_value);
+  return true;
+}
+
 void AutotermUART::set_use_work_time(bool use) {
   update_settings_([use](Settings &s) { s.use_work_time = use ? 0 : 1; });
 }
@@ -590,8 +610,8 @@ void AutotermUART::publish_settings_(const Settings &settings) {
   std::string temp_source_txt = temperature_source_to_string(settings.temperature_source);
   if (temperature_source_text_sensor_) temperature_source_text_sensor_->publish_state(temp_source_txt);
 
-  if (temperature_source_number_)
-    temperature_source_number_->publish_state(settings.temperature_source);
+  if (temperature_source_select_)
+    temperature_source_select_->publish_state(temp_source_txt);
   if (set_temperature_number_)
     set_temperature_number_->publish_state(settings.set_temperature);
   if (work_time_number_)
@@ -626,6 +646,18 @@ std::string AutotermUART::temperature_source_to_string(uint8_t value) const {
     default:
       return "unknown";
   }
+}
+
+uint8_t AutotermUART::temperature_source_from_string(const std::string &value) const {
+  if (value == "internal sensor")
+    return 1;
+  if (value == "panel sensor")
+    return 2;
+  if (value == "external sensor")
+    return 3;
+  if (value == "no automatic temperature control")
+    return 4;
+  return 0;
 }
 
 void AutotermPowerOffButton::press_action() {

@@ -159,6 +159,7 @@ class AutotermUART : public Component {
   Sensor *internal_temp_sensor_{nullptr};
   Sensor *external_temp_sensor_{nullptr};
   Sensor *heater_temp_sensor_{nullptr};
+  Sensor *panel_temp_sensor_{nullptr};
   Sensor *voltage_sensor_{nullptr};
   Sensor *status_sensor_{nullptr};
   Sensor *fan_speed_set_sensor_{nullptr};
@@ -206,6 +207,7 @@ class AutotermUART : public Component {
   bool virtual_panel_value_valid_{false};
   uint8_t virtual_panel_last_raw_{0};
   float virtual_panel_last_value_c_{NAN};
+  float panel_temp_last_value_c_{NAN};
   uint32_t last_virtual_panel_send_millis_{0};
   std::vector<uint8_t> display_to_heater_buffer_;
   std::vector<uint8_t> heater_to_display_buffer_;
@@ -224,6 +226,12 @@ class AutotermUART : public Component {
   void set_fan_speed_set_sensor(Sensor *s) { fan_speed_set_sensor_ = s; }
   void set_fan_speed_actual_sensor(Sensor *s) { fan_speed_actual_sensor_ = s; }
   void set_pump_frequency_sensor(Sensor *s) { pump_frequency_sensor_ = s; }
+  void set_panel_temp_sensor(Sensor *s) {
+    panel_temp_sensor_ = s;
+    if (s != nullptr && std::isfinite(panel_temp_last_value_c_)) {
+      s->publish_state(panel_temp_last_value_c_);
+    }
+  }
   void set_temperature_source_text_sensor(text_sensor::TextSensor *s) {
     temperature_source_text_sensor_ = s;
   }
@@ -368,6 +376,8 @@ class AutotermUART : public Component {
           int total = 5 + len + 2;  // Header + Payload + CRC
           if (buffer.size() >= total) {
             if (validate_crc(buffer)) {
+              if (from_display && is_panel_temperature_frame_(buffer))
+                handle_panel_temperature_frame_(buffer);
               log_frame(tag, buffer);
               parse_status(buffer);
               parse_settings(buffer);
@@ -409,6 +419,7 @@ class AutotermUART : public Component {
       if (crc_ok && is_panel_temperature_frame_(buffer)) {
         drop = true;
         ESP_LOGD("autoterm_uart", "Suppressing panel temperature frame while override active");
+        handle_panel_temperature_frame_(buffer);
       }
 
       if (!drop) {
@@ -478,6 +489,7 @@ public:
   void transmit_virtual_panel_temperature_();
   void set_virtual_panel_override_enabled_(bool enabled);
   bool is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const;
+  void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
 };
 
 // ===================
@@ -802,6 +814,18 @@ bool AutotermUART::is_panel_temperature_frame_(const std::vector<uint8_t> &frame
   if (frame[4] != 0x11)
     return false;
   return true;
+}
+
+void AutotermUART::handle_panel_temperature_frame_(const std::vector<uint8_t> &frame) {
+  if (frame.size() < 6)
+    return;
+
+  uint8_t raw = frame[5];
+  float temperature_c = static_cast<float>(raw);
+  panel_temp_last_value_c_ = temperature_c;
+
+  if (panel_temp_sensor_ != nullptr)
+    panel_temp_sensor_->publish_state(temperature_c);
 }
 
 void AutotermUART::request_settings() {

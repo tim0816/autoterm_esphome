@@ -5,15 +5,22 @@ import esphome.components.uart as uart
 import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
+import esphome.components.switch as switch
 import esphome.components.button as button
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "button"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
 AutotermPowerOffButton = autoterm_ns.class_("AutotermPowerOffButton", button.Button)
 AutotermFanModeButton = autoterm_ns.class_("AutotermFanModeButton", button.Button)
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
+AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
+AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
+AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
+AutotermTemperatureSourceNumber = autoterm_ns.class_("AutotermTemperatureSourceNumber", number.Number)
+AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
+AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
 
 CONFIG_SCHEMA = cv.Schema({
@@ -42,6 +49,30 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
     cv.Optional("fan_mode"): button.button_schema(class_=AutotermFanModeButton, icon="mdi:fan"),
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
+    cv.Optional("set_temperature_control"): number.number_schema(
+        class_=AutotermSetTemperatureNumber,
+        icon="mdi:thermometer",
+    ),
+    cv.Optional("work_time_control"): number.number_schema(
+        class_=AutotermWorkTimeNumber,
+        icon="mdi:clock-outline",
+    ),
+    cv.Optional("power_level_control"): number.number_schema(
+        class_=AutotermPowerLevelNumber,
+        icon="mdi:fan",
+    ),
+    cv.Optional("temperature_source_control"): number.number_schema(
+        class_=AutotermTemperatureSourceNumber,
+        icon="mdi:thermometer",
+    ),
+    cv.Optional("use_work_time_switch"): switch.switch_schema(
+        class_=AutotermUseWorkTimeSwitch,
+        icon="mdi:timer-cog-outline",
+    ),
+    cv.Optional("wait_mode_switch"): switch.switch_schema(
+        class_=AutotermWaitModeSwitch,
+        icon="mdi:pause",
+    ),
 
 
 })
@@ -102,3 +133,37 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_fan_level_number(num))
+    if "set_temperature_control" in config:
+        conf = config["set_temperature_control"]
+        min_v = conf.get("min_value", 0)
+        max_v = conf.get("max_value", 40)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_set_temperature_number(num))
+    if "work_time_control" in config:
+        conf = config["work_time_control"]
+        min_v = conf.get("min_value", 0)
+        max_v = conf.get("max_value", 255)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_work_time_number(num))
+    if "power_level_control" in config:
+        conf = config["power_level_control"]
+        min_v = conf.get("min_value", 0)
+        max_v = conf.get("max_value", 9)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_power_level_number(num))
+    if "temperature_source_control" in config:
+        conf = config["temperature_source_control"]
+        min_v = conf.get("min_value", 1)
+        max_v = conf.get("max_value", 4)
+        step_v = conf.get("step", 1)
+        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
+        cg.add(var.set_temperature_source_number(num))
+    if "use_work_time_switch" in config:
+        sw = await switch.new_switch(config["use_work_time_switch"])
+        cg.add(var.set_use_work_time_switch(sw))
+    if "wait_mode_switch" in config:
+        sw = await switch.new_switch(config["wait_mode_switch"])
+        cg.add(var.set_wait_mode_switch(sw))

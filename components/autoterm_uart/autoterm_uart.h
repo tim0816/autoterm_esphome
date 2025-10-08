@@ -5,7 +5,10 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/switch/switch.h"
 #include <vector>
+#include <functional>
+#include <string>
 
 namespace esphome {
 namespace autoterm_uart {
@@ -31,11 +34,11 @@ class AutotermPowerOffButton : public button::Button {
   public:
    AutotermUART *parent_{nullptr};
    void setup_parent(AutotermUART *p) { parent_ = p; }
- 
+
   protected:
    void press_action() override;  // implementieren wir unten
  };
- 
+
 
 // ===================
 // Custom Button Class (Lüften)
@@ -59,6 +62,60 @@ class AutotermFanLevelNumber : public number::Number {
 
  protected:
   void control(float value) override;  // Implementierung folgt unten
+};
+
+class AutotermSetTemperatureNumber : public number::Number {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void control(float value) override;
+};
+
+class AutotermWorkTimeNumber : public number::Number {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void control(float value) override;
+};
+
+class AutotermPowerLevelNumber : public number::Number {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void control(float value) override;
+};
+
+class AutotermTemperatureSourceNumber : public number::Number {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void control(float value) override;
+};
+
+class AutotermUseWorkTimeSwitch : public esphome::switch_::Switch {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void write_state(bool state) override;
+};
+
+class AutotermWaitModeSwitch : public esphome::switch_::Switch {
+ public:
+  AutotermUART *parent_{nullptr};
+  void setup_parent(AutotermUART *p) { parent_ = p; }
+
+ protected:
+  void write_state(bool state) override;
 };
 
 // ===================
@@ -92,6 +149,22 @@ class AutotermUART : public Component {
   AutotermPowerOffButton *power_off_button_{nullptr};
   AutotermFanModeButton *fan_mode_button_{nullptr};
   AutotermFanLevelNumber *fan_level_number_{nullptr};
+  AutotermSetTemperatureNumber *set_temperature_number_{nullptr};
+  AutotermWorkTimeNumber *work_time_number_{nullptr};
+  AutotermPowerLevelNumber *power_level_number_{nullptr};
+  AutotermTemperatureSourceNumber *temperature_source_number_{nullptr};
+  AutotermUseWorkTimeSwitch *use_work_time_switch_{nullptr};
+  AutotermWaitModeSwitch *wait_mode_switch_{nullptr};
+
+  struct Settings {
+    uint8_t use_work_time = 1;
+    uint8_t work_time = 0;
+    uint8_t temperature_source = 4;
+    uint8_t set_temperature = 16;
+    uint8_t wait_mode = 0;
+    uint8_t power_level = 8;
+  } settings_;
+  bool settings_valid_{false};
 
   void send_power_on();
   void send_power_off();
@@ -135,11 +208,37 @@ class AutotermUART : public Component {
     fan_level_number_ = n;
     if (n) n->setup_parent(this);
   }
+  void set_set_temperature_number(AutotermSetTemperatureNumber *n) {
+    set_temperature_number_ = n;
+    if (n) n->setup_parent(this);
+  }
+  void set_work_time_number(AutotermWorkTimeNumber *n) {
+    work_time_number_ = n;
+    if (n) n->setup_parent(this);
+  }
+  void set_power_level_number(AutotermPowerLevelNumber *n) {
+    power_level_number_ = n;
+    if (n) n->setup_parent(this);
+  }
+  void set_temperature_source_number(AutotermTemperatureSourceNumber *n) {
+    temperature_source_number_ = n;
+    if (n) n->setup_parent(this);
+  }
+  void set_use_work_time_switch(AutotermUseWorkTimeSwitch *s) {
+    use_work_time_switch_ = s;
+    if (s) s->setup_parent(this);
+  }
+  void set_wait_mode_switch(AutotermWaitModeSwitch *s) {
+    wait_mode_switch_ = s;
+    if (s) s->setup_parent(this);
+  }
 
   void loop() override {
     forward_and_sniff(uart_display_, uart_heater_, "display→heater");
     forward_and_sniff(uart_heater_, uart_display_, "heater→display");
   }
+
+  void setup() override { request_settings(); }
 
  protected:
   void forward_and_sniff(UARTComponent *src, UARTComponent *dst, const char *tag) {
@@ -203,6 +302,19 @@ class AutotermUART : public Component {
   void parse_settings(const std::vector<uint8_t> &data);
 public:
   void send_fan_mode(bool on, int level);
+  void set_set_temperature(uint8_t value);
+  void set_work_time(uint8_t value);
+  void set_power_level(uint8_t value);
+  void set_temperature_source(uint8_t value);
+  void set_use_work_time(bool use);
+  void set_wait_mode(bool on);
+
+ protected:
+  void request_settings();
+  void send_settings(const Settings &settings);
+  void publish_settings_(const Settings &settings);
+  void update_settings_(const std::function<void(Settings &)> &updater);
+  std::string temperature_source_to_string(uint8_t value) const;
 };
 
 // ===================
@@ -227,6 +339,36 @@ void AutotermFanModeButton::press_action() {
 void AutotermFanLevelNumber::control(float value) {
   publish_state(value);
   if (parent_) parent_->send_fan_mode(true, (int)value);
+}
+
+void AutotermSetTemperatureNumber::control(float value) {
+  publish_state(value);
+  if (parent_) parent_->set_set_temperature(static_cast<uint8_t>(value));
+}
+
+void AutotermWorkTimeNumber::control(float value) {
+  publish_state(value);
+  if (parent_) parent_->set_work_time(static_cast<uint8_t>(value));
+}
+
+void AutotermPowerLevelNumber::control(float value) {
+  publish_state(value);
+  if (parent_) parent_->set_power_level(static_cast<uint8_t>(value));
+}
+
+void AutotermTemperatureSourceNumber::control(float value) {
+  publish_state(value);
+  if (parent_) parent_->set_temperature_source(static_cast<uint8_t>(value));
+}
+
+void AutotermUseWorkTimeSwitch::write_state(bool state) {
+  publish_state(state);
+  if (parent_) parent_->set_use_work_time(state);
+}
+
+void AutotermWaitModeSwitch::write_state(bool state) {
+  publish_state(state);
+  if (parent_) parent_->set_wait_mode(state);
 }
 
 // ===================
@@ -320,32 +462,16 @@ void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
     ESP_LOGD("autoterm_uart",
              "Settings: use_work_time=%d work_time=%d temp_src=%d set_temp=%d wait_mode=%d level=%d",
              use_work_time, work_time, temp_source, set_temp, wait_mode, power_level);
-
-    if (use_work_time_sensor_) use_work_time_sensor_->publish_state(use_work_time);
-    if (work_time_sensor_) work_time_sensor_->publish_state(work_time);
-    if (temperature_source_text_sensor_) {
-      const char *temp_source_txt = "unknown";
-      switch (temp_source) {
-        case 1:
-          temp_source_txt = "internal sensor";
-          break;
-        case 2:
-          temp_source_txt = "panel sensor";
-          break;
-        case 3:
-          temp_source_txt = "external sensor";
-          break;
-        case 4:
-          temp_source_txt = "no automatic temperature control";
-          break;
-        default:
-          break;
-      }
-      temperature_source_text_sensor_->publish_state(temp_source_txt);
-    }
-    if (set_temperature_sensor_) set_temperature_sensor_->publish_state(set_temp);
-    if (wait_mode_sensor_) wait_mode_sensor_->publish_state(wait_mode);
-    if (power_level_sensor_) power_level_sensor_->publish_state(power_level);
+    Settings s{};
+    s.use_work_time = use_work_time;
+    s.work_time = work_time;
+    s.temperature_source = temp_source;
+    s.set_temperature = set_temp;
+    s.wait_mode = wait_mode;
+    s.power_level = power_level;
+    settings_ = s;
+    settings_valid_ = true;
+    publish_settings_(settings_);
   }
 }
 
@@ -373,6 +499,133 @@ void AutotermUART::send_fan_mode(bool on, int level) {
 
   ESP_LOGI("autoterm_uart", "Sent Fan Mode %s, Level %d (CRC %04X)",
            on ? "ON" : "OFF", level, crc);
+}
+
+void AutotermUART::set_set_temperature(uint8_t value) {
+  update_settings_([value](Settings &s) { s.set_temperature = value; });
+}
+
+void AutotermUART::set_work_time(uint8_t value) {
+  update_settings_([value](Settings &s) { s.work_time = value; });
+}
+
+void AutotermUART::set_power_level(uint8_t value) {
+  update_settings_([value](Settings &s) { s.power_level = value; });
+}
+
+void AutotermUART::set_temperature_source(uint8_t value) {
+  update_settings_([value](Settings &s) { s.temperature_source = value; });
+}
+
+void AutotermUART::set_use_work_time(bool use) {
+  update_settings_([use](Settings &s) { s.use_work_time = use ? 0 : 1; });
+}
+
+void AutotermUART::set_wait_mode(bool on) {
+  update_settings_([on](Settings &s) { s.wait_mode = on ? 1 : 2; });
+}
+
+void AutotermUART::request_settings() {
+  if (!uart_heater_) return;
+  const uint8_t header[] = {0xAA, 0x03, 0x00, 0x00, 0x02};
+  std::vector<uint8_t> frame(header, header + sizeof(header));
+
+  uint16_t crc = 0xFFFF;
+  for (auto b : frame) {
+    crc ^= b;
+    for (int i = 0; i < 8; i++)
+      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  }
+  frame.push_back((crc >> 8) & 0xFF);
+  frame.push_back(crc & 0xFF);
+
+  uart_heater_->write_array(frame);
+  uart_heater_->flush();
+
+  ESP_LOGI("autoterm_uart", "Requested settings (CRC %04X)", crc);
+}
+
+void AutotermUART::send_settings(const Settings &settings) {
+  if (!uart_heater_) return;
+  uint8_t header[5] = {0xAA, 0x03, 0x06, 0x00, 0x02};
+  uint8_t payload[6] = {settings.use_work_time,
+                        settings.work_time,
+                        settings.temperature_source,
+                        settings.set_temperature,
+                        settings.wait_mode,
+                        settings.power_level};
+
+  std::vector<uint8_t> frame(header, header + 5);
+  frame.insert(frame.end(), payload, payload + 6);
+
+  uint16_t crc = 0xFFFF;
+  for (auto b : frame) {
+    crc ^= b;
+    for (int i = 0; i < 8; i++)
+      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  }
+  frame.push_back((crc >> 8) & 0xFF);
+  frame.push_back(crc & 0xFF);
+
+  uart_heater_->write_array(frame);
+  uart_heater_->flush();
+
+  ESP_LOGI("autoterm_uart",
+           "Sent settings: use_work_time=%u work_time=%u temp_src=%u set_temp=%u wait_mode=%u level=%u (CRC %04X)",
+           settings.use_work_time, settings.work_time, settings.temperature_source,
+           settings.set_temperature, settings.wait_mode, settings.power_level, crc);
+
+  settings_ = settings;
+  settings_valid_ = true;
+  publish_settings_(settings_);
+}
+
+void AutotermUART::publish_settings_(const Settings &settings) {
+  if (use_work_time_sensor_) use_work_time_sensor_->publish_state(settings.use_work_time);
+  if (work_time_sensor_) work_time_sensor_->publish_state(settings.work_time);
+  if (set_temperature_sensor_) set_temperature_sensor_->publish_state(settings.set_temperature);
+  if (wait_mode_sensor_) wait_mode_sensor_->publish_state(settings.wait_mode);
+  if (power_level_sensor_) power_level_sensor_->publish_state(settings.power_level);
+
+  std::string temp_source_txt = temperature_source_to_string(settings.temperature_source);
+  if (temperature_source_text_sensor_) temperature_source_text_sensor_->publish_state(temp_source_txt);
+
+  if (temperature_source_number_)
+    temperature_source_number_->publish_state(settings.temperature_source);
+  if (set_temperature_number_)
+    set_temperature_number_->publish_state(settings.set_temperature);
+  if (work_time_number_)
+    work_time_number_->publish_state(settings.work_time);
+  if (power_level_number_)
+    power_level_number_->publish_state(settings.power_level);
+  if (use_work_time_switch_)
+    use_work_time_switch_->publish_state(settings.use_work_time == 0);
+  if (wait_mode_switch_)
+    wait_mode_switch_->publish_state(settings.wait_mode == 1);
+}
+
+void AutotermUART::update_settings_(const std::function<void(Settings &)> &updater) {
+  Settings new_settings = settings_;
+  if (!settings_valid_) {
+    new_settings = Settings{};
+  }
+  updater(new_settings);
+  send_settings(new_settings);
+}
+
+std::string AutotermUART::temperature_source_to_string(uint8_t value) const {
+  switch (value) {
+    case 1:
+      return "internal sensor";
+    case 2:
+      return "panel sensor";
+    case 3:
+      return "external sensor";
+    case 4:
+      return "no automatic temperature control";
+    default:
+      return "unknown";
+  }
 }
 
 void AutotermPowerOffButton::press_action() {

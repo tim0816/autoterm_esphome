@@ -8,8 +8,9 @@ import esphome.components.number as number
 import esphome.components.switch as switch
 import esphome.components.select as select
 import esphome.components.button as button
+import esphome.components.binary_sensor as binary_sensor
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select", "binary_sensor"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
@@ -52,6 +53,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("power_level"): sensor.sensor_schema(icon="mdi:fan"),
     cv.Optional("wait_mode"): sensor.sensor_schema(icon="mdi:pause"),
     cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
+    cv.Optional("display_connected"): binary_sensor.binary_sensor_schema(icon="mdi:monitor"),
 
     cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
     cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
@@ -120,6 +122,10 @@ async def to_code(config):
         if key in config:
             txt = await text_sensor.new_text_sensor(config[key])
             cg.add(getattr(var, setter)(txt))
+
+    if "display_connected" in config:
+        bs = await binary_sensor.new_binary_sensor(config["display_connected"])
+        cg.add(var.set_display_connected_sensor(bs))
 
     if "power_on" in config:
         btn = await button.new_button(config["power_on"])

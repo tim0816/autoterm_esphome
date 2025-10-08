@@ -55,12 +55,6 @@ text_sensor:
 
 switch:
 
-number:
-
-button:
-
-select:
-
 autoterm_uart:
   uart_display_id: uart_display
   uart_heater_id: uart_heater
@@ -110,6 +104,8 @@ autoterm_uart:
     name: "Arbeitszeit verwenden"
   wait_mode_switch:
     name: "Wartebetrieb"
+  display_connected:
+    name: "Display Connected"
 
   # --- Settings-Auswertung ---
   temperature_source:

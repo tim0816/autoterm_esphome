@@ -7,6 +7,8 @@
 #include "esphome/components/button/button.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/select/select.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/core/time.h"
 #include <vector>
 #include <functional>
 #include <string>
@@ -147,6 +149,7 @@ class AutotermUART : public Component {
   Sensor *wait_mode_sensor_{nullptr};
   Sensor *use_work_time_sensor_{nullptr};
   text_sensor::TextSensor *status_text_sensor_{nullptr};
+  binary_sensor::BinarySensor *display_connected_sensor_{nullptr};
 
 
   // Steuerobjekte
@@ -170,6 +173,10 @@ class AutotermUART : public Component {
     uint8_t power_level = 8;
   } settings_;
   bool settings_valid_{false};
+  bool display_connected_state_{false};
+  uint32_t last_display_activity_{0};
+  uint32_t last_status_request_millis_{0};
+  uint32_t last_settings_request_millis_{0};
 
   void send_power_on();
   void send_power_off();
@@ -194,6 +201,9 @@ class AutotermUART : public Component {
   void set_wait_mode_sensor(Sensor *s) { wait_mode_sensor_ = s; }
   void set_use_work_time_sensor(Sensor *s) { use_work_time_sensor_ = s; }
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
+  void set_display_connected_sensor(binary_sensor::BinarySensor *s) {
+    display_connected_sensor_ = s;
+  }
 
 
   // Neue Setter mit Rückreferenz
@@ -239,14 +249,44 @@ class AutotermUART : public Component {
   }
 
   void loop() override {
-    forward_and_sniff(uart_display_, uart_heater_, "display→heater");
+    uint32_t now = millis();
+
+    forward_and_sniff(uart_display_, uart_heater_, "display→heater", true);
     forward_and_sniff(uart_heater_, uart_display_, "heater→display");
+
+    bool connected = uart_display_ != nullptr && (now - last_display_activity_) < 5000;
+    if (connected != display_connected_state_) {
+      display_connected_state_ = connected;
+      ESP_LOGI("autoterm_uart", "Display connection %s", connected ? "detected" : "lost");
+      if (display_connected_sensor_)
+        display_connected_sensor_->publish_state(connected);
+      if (connected) {
+        last_status_request_millis_ = now;
+        last_settings_request_millis_ = now;
+      }
+    }
+
+    if (!connected) {
+      if (now - last_status_request_millis_ >= 1000) {
+        send_status_request();
+        last_status_request_millis_ = now;
+      }
+      if (now - last_settings_request_millis_ >= 10000) {
+        request_settings();
+        last_settings_request_millis_ = now;
+      }
+    }
   }
 
-  void setup() override { request_settings(); }
+  void setup() override {
+    if (display_connected_sensor_)
+      display_connected_sensor_->publish_state(false);
+    request_settings();
+  }
 
  protected:
-  void forward_and_sniff(UARTComponent *src, UARTComponent *dst, const char *tag) {
+  void forward_and_sniff(UARTComponent *src, UARTComponent *dst, const char *tag,
+                         bool from_display = false) {
     static std::vector<uint8_t> buffer;
     if (!src || !dst) return;
 
@@ -255,6 +295,9 @@ class AutotermUART : public Component {
       if (!src->read_byte(&b)) break;
       dst->write_byte(b);
       buffer.push_back(b);
+
+      if (from_display)
+        last_display_activity_ = millis();
 
       // Startbyte prüfen
       if (buffer.size() >= 3 && buffer[0] == 0xAA) {
@@ -317,6 +360,7 @@ public:
 
  protected:
   void request_settings();
+  void send_status_request();
   void send_settings(const Settings &settings);
   void publish_settings_(const Settings &settings);
   void update_settings_(const std::function<void(Settings &)> &updater);
@@ -567,6 +611,29 @@ void AutotermUART::request_settings() {
   uart_heater_->flush();
 
   ESP_LOGI("autoterm_uart", "Requested settings (CRC %04X)", crc);
+  last_settings_request_millis_ = millis();
+}
+
+void AutotermUART::send_status_request() {
+  if (!uart_heater_) return;
+
+  const uint8_t header[] = {0xAA, 0x03, 0x00, 0x00, 0x0F};
+  std::vector<uint8_t> frame(header, header + sizeof(header));
+
+  uint16_t crc = 0xFFFF;
+  for (auto b : frame) {
+    crc ^= b;
+    for (int i = 0; i < 8; i++)
+      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  }
+  frame.push_back((crc >> 8) & 0xFF);
+  frame.push_back(crc & 0xFF);
+
+  uart_heater_->write_array(frame);
+  uart_heater_->flush();
+
+  ESP_LOGD("autoterm_uart", "Requested status (CRC %04X)", crc);
+  last_status_request_millis_ = millis();
 }
 
 void AutotermUART::send_settings(const Settings &settings) {

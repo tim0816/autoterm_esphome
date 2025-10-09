@@ -37,108 +37,11 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 
 ---
 
-## ⚙️ Beispielkonfiguration (`air2d.yaml`)
+## ⚙️ Beispielkonfiguration
 
-```yaml
-esphome:
-  name: air2d
-  platform: ESP32
-  board: esp32dev
-
-uart:
-  - id: uart_display
-    tx_pin: GPIO17
-    rx_pin: GPIO16
-    baud_rate: 9600
-  - id: uart_heater
-    tx_pin: GPIO27
-    rx_pin: GPIO26
-    baud_rate: 9600
-
-external_components:
-  - source: github://<DEIN_USER>/autoterm_uart
-
-autoterm_uart:
-  uart_display_id: uart_display
-  uart_heater_id: uart_heater
-  internal_temp:
-    name: "Interne Temperatur"
-  external_temp:
-    name: "Externe Temperatur"
-  heater_temp:
-    name: "Heizkörper Temperatur"
-  panel_temp:
-    name: "Panel Temperatur"
-  voltage:
-    name: "Bordnetzspannung"
-  status:
-    name: "Statuswert (numerisch)"
-  status_text:
-    name: "Heizstatus (Text)"
-  fan_speed_set:
-    name: "Lüfter Soll (rpm)"
-  fan_speed_actual:
-    name: "Lüfter Ist (rpm)"
-  pump_frequency:
-    name: "Pumpenfrequenz (Hz)"
-  temperature_source:
-    name: "Temperaturquelle"
-  set_temperature:
-    name: "Solltemperatur (Sensor)"
-  work_time:
-    name: "Arbeitszeit (min)"
-  power_level:
-    name: "Leistungsstufe"
-  wait_mode:
-    name: "Warte-Modus (Sensor)"
-  use_work_time:
-    name: "Arbeitszeit verwenden (Sensor)"
-  display_connected:
-    name: "Display verbunden"
-
-  power_on:
-    name: "Heizung Ein"
-  power_off:
-    name: "Heizung Aus"
-  fan_mode:
-    name: "Nur Lüften starten"
-  fan_level:
-    name: "Lüfterstufe"
-    min_value: 0
-    max_value: 9
-    step: 1
-  set_temperature_control:
-    name: "Zieltemperatur"
-    min_value: 5
-    max_value: 40
-    step: 1
-  work_time_control:
-    name: "Arbeitszeit (min)"
-    min_value: 0
-    max_value: 255
-    step: 1
-  power_level_control:
-    name: "Leistungsstufe"
-    min_value: 0
-    max_value: 9
-    step: 1
-  temperature_source_control:
-    name: "Temperaturquelle wählen"
-  virtual_panel_temperature_control:
-    name: "Virtuelle Paneltemperatur"
-    min_value: 0
-    max_value: 40
-    step: 1
-  virtual_panel_override_switch:
-    name: "Virtuelles Panel aktivieren"
-  use_work_time_switch:
-    name: "Arbeitszeit verwenden (Schalter)"
-  wait_mode_switch:
-    name: "Warte-Modus (Schalter)"
-
-logger:
-  level: DEBUG
-```
+Die vollständige Beispielkonfiguration findest du in der Datei **`air2d.yaml`**.  
+Sie zeigt, wie die Autoterm-UART-Komponente in ESPHome eingebunden wird.  
+Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfiguration** an.
 
 ---
 
@@ -362,31 +265,11 @@ Getestet mit:
 
 ---
 
-## 🚀 Installation
-
-1. Repository klonen:
-
-   ```bash
-   git clone https://github.com/<DEIN_USER>/autoterm_uart.git
-   ```
-
-2. In deiner ESPHome-YAML einbinden:
-
-   ```yaml
-   external_components:
-     - source: github://<DEIN_USER>/autoterm_uart
-   ```
-
-3. Kompilieren und auf den ESP32 flashen.
-
----
-
 ## 🛠️ Bekannte Einschränkungen
 
 - Autoterm-Protokoll teilweise reverse-engineered  
 - Unbekannte Statuscodes werden als HEX angezeigt  
-- UART-Verbindungen müssen elektrisch sauber sein  
-- Fan Mode sendet aktuell nur ON, nicht OFF  
+- UART-Verbindungen müssen elektrisch sauber sein   
 
 ---
 

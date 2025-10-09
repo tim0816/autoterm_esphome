@@ -90,15 +90,6 @@ autoterm_uart:
     name: "Pump Frequency"
     unit_of_measurement: "Hz"
 
-  power_off:
-    name: "Ausschalten"
-  power_on:
-    name: "Einschalten"
-
-  fan_mode:
-    name: "Lüften"
-
-
   set_temperature_control:
     name: "Solltemperatur"
   work_time_control:

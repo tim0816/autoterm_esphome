@@ -7,15 +7,7 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 
 > [!WARNING]
 > **Experimentelles Projekt – Nutzung auf eigene Gefahr!**  
-> Dieses Repository befindet sich **noch in Entwicklung**. Falsche Verdrahtung, fehlerhafte Konfiguration oder unvorhersehbares Verhalten der Firmware können die **Heizung beschädigen** oder zu **Gefahrensituationen** führen (Überhitzung, Brand, Ausgasung).
->
-> **Du bist selbst verantwortlich** für alle Änderungen, die du an Hardware und Software vornimmst.  
-> - Prüfe **Verdrahtung und Spannungspegel** (UART, GND, Versorgung) sorgfältig.  
-> - Teste zunächst **ohne angeschlossenen Kraftstoff / ohne reale Last**.  
-> - Nutze eine **sichere Stromversorgung** mit Strombegrenzung (Labornetzteil).  
-> - Stelle sicher, dass **Überhitzungs- und Not-Aus**-Mechanismen funktionieren.  
-> - Beobachte die Heizung bei Tests **dauerhaft** (kein unbeaufsichtigter Betrieb).  
-> - Beachte, dass durch Nutzung **Garantie- und Gewährleistungsansprüche** entfallen können.
+> Dieses Repository befindet sich **noch in Entwicklung**. Falsche Verdrahtung, fehlerhafte Konfiguration oder unvorhersehbares Verhalten der Firmware können die **Heizung beschädigen**.
 >
 > Wenn du dir unsicher bist: **nicht verwenden**.
 

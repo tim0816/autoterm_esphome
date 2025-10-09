@@ -1,162 +1,396 @@
-# 🔥 Autoterm Air2D ESPHome Integration
+# 🔥 Autoterm UART Bridge für ESPHome
 
-> Vollständige ESPHome-Integration für die Autoterm / Planar Air2D Dieselheizung
-> mit direkter UART-Kommunikation über einen ESP32 – inklusive Status-, Sensor-
-> und Steuerfunktionen (Heizen, Lüften, Abschalten, Parameter).
-
----
-
-## 🧩 Überblick
-
-Dieses Projekt ermöglicht die **vollständige Ansteuerung und Überwachung einer Autoterm Air2D / Planar 2D** Heizung
-über einen **ESP32 mit ESPHome**. Die Firmware lauscht parallel auf den Verbindungen zwischen Bedienteil und Heizung
-und kann gleichzeitig eigene Kommandos senden.
-
-Die Kommunikation erfolgt direkt über den UART-Bus zwischen:
-- 📟 **Bedienteil (Display)**
-- 🔥 **Heizung (Controller)**
-- 🧠 **ESP32 (Bridge + Parser)**
-
-Der ESP liest und schreibt Telegramme im Autoterm-Protokoll (0xAA … CRC16)
-und stellt alle Werte als Sensoren, Schalter, Buttons, Nummern und Selects in Home Assistant bereit.
+Dieses Projekt implementiert eine vollständige **UART-Bridge zwischen Autoterm/Planar-Heizungen und dem Bedienteil**, mit Integration in **ESPHome** und damit Home Assistant.  
+Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT oder Home Assistant Entities.
 
 ---
 
-## ⚙️ Funktionsumfang
-
-| Kategorie | Beschreibung |
-|:--|:--|
-| 🔍 **Status-Monitoring** | Liest Temperatur-, Spannungs-, Drehzahl- und Pumpenwerte inklusive Statuscode und Text aus dem Heizungsbus und publiziert sie als Sensoren/Text-Sensoren. |
-| 🧭 **Settings-Verwaltung** | Fragt zyklisch die aktuellen Einstellungen (Temperaturquelle, Solltemperatur, Arbeitszeit, Leistungsstufe, Wartebetrieb, Arbeitszeitmodus) ab, speichert sie lokal und veröffentlicht sie in Home Assistant. |
-| 🌀 **Lüftersteuerung** | Aktiviert den Lüftermodus („only fan“) und setzt die Lüfterstufe (0–9). |
-| 🔥 **Heizleistung & Temperatur** | Stellt Solltemperatur (0–40 °C), Arbeitszeit (0–255 min) und Leistungsstufe (0–9) per Number-Entitäten ein. |
-| 🔌 **Start/Stop** | Startet (`power_on`) bzw. stoppt (`power_off`) die Heizung per Button-Entitäten. |
-| 🪄 **Bridge-Funktion** | Forwardet alle UART-Frames zwischen Display ↔ Heizung und „snifft“ dabei passiv mit – inklusive CRC16-Validierung & Hex-Logging. |
-| 🏠 **Home Assistant Integration** | Alle Sensoren, Buttons, Switches, Number- und Select-Entitäten werden automatisch angelegt; Min-/Max-/Step-Werte sind konfigurierbar und haben sinnvolle Defaultwerte. |
+> [!WARNING]
+> **Experimentelles Projekt – Nutzung auf eigene Gefahr!**  
+> Dieses Repository befindet sich **noch in Entwicklung**. Falsche Verdrahtung, fehlerhafte Konfiguration oder unvorhersehbares Verhalten der Firmware können die **Heizung beschädigen** oder zu **Gefahrensituationen** führen (Überhitzung, Brand, Ausgasung).
+>
+> **Du bist selbst verantwortlich** für alle Änderungen, die du an Hardware und Software vornimmst.  
+> - Prüfe **Verdrahtung und Spannungspegel** (UART, GND, Versorgung) sorgfältig.  
+> - Teste zunächst **ohne angeschlossenen Kraftstoff / ohne reale Last**.  
+> - Nutze eine **sichere Stromversorgung** mit Strombegrenzung (Labornetzteil).  
+> - Stelle sicher, dass **Überhitzungs- und Not-Aus**-Mechanismen funktionieren.  
+> - Beobachte die Heizung bei Tests **dauerhaft** (kein unbeaufsichtigter Betrieb).  
+> - Beachte, dass durch Nutzung **Garantie- und Gewährleistungsansprüche** entfallen können.
+>
+> Wenn du dir unsicher bist: **nicht verwenden**.
 
 ---
 
-## 🧱 Projektstruktur
+## 📦 Funktionsübersicht
+
+- 🧭 **Bidirektionale UART-Bridge** zwischen Display und Heizung  
+- 📊 **Status- und Sensordaten**: Innen-, Außen-, Heiz- und Paneltemperatur, Spannung, Pumpenfrequenz, Lüfterdrehzahl  
+- 🔘 **Steuerfunktionen**:
+  - Ein-/Ausschalten der Heizung  
+  - Nur Lüften (Fan Mode)  
+  - Einstellen von Zieltemperatur, Leistungsstufe und Arbeitszeit  
+  - Umschalten der Temperaturquelle  
+  - Aktivieren eines „virtuellen Panel“-Modus (Override)  
+- 🧩 **Kompatibel mit Home Assistant** (über ESPHome Integration)  
+- 🧾 **Debug-Modus**: zeigt empfangene und gesendete UART-Frames in HEX-Darstellung  
+- ⚙️ Unterstützt automatische Wiederverbindung und Statusabfrage, wenn kein Display erkannt wird  
+
+---
+
+## ⚙️ Beispielkonfiguration (`air2d.yaml`)
+
+```yaml
+esphome:
+  name: air2d
+  platform: ESP32
+  board: esp32dev
+
+uart:
+  - id: uart_display
+    tx_pin: GPIO17
+    rx_pin: GPIO16
+    baud_rate: 9600
+  - id: uart_heater
+    tx_pin: GPIO27
+    rx_pin: GPIO26
+    baud_rate: 9600
+
+external_components:
+  - source: github://<DEIN_USER>/autoterm_uart
+
+autoterm_uart:
+  uart_display_id: uart_display
+  uart_heater_id: uart_heater
+  internal_temp:
+    name: "Interne Temperatur"
+  external_temp:
+    name: "Externe Temperatur"
+  heater_temp:
+    name: "Heizkörper Temperatur"
+  panel_temp:
+    name: "Panel Temperatur"
+  voltage:
+    name: "Bordnetzspannung"
+  status:
+    name: "Statuswert (numerisch)"
+  status_text:
+    name: "Heizstatus (Text)"
+  fan_speed_set:
+    name: "Lüfter Soll (rpm)"
+  fan_speed_actual:
+    name: "Lüfter Ist (rpm)"
+  pump_frequency:
+    name: "Pumpenfrequenz (Hz)"
+  temperature_source:
+    name: "Temperaturquelle"
+  set_temperature:
+    name: "Solltemperatur (Sensor)"
+  work_time:
+    name: "Arbeitszeit (min)"
+  power_level:
+    name: "Leistungsstufe"
+  wait_mode:
+    name: "Warte-Modus (Sensor)"
+  use_work_time:
+    name: "Arbeitszeit verwenden (Sensor)"
+  display_connected:
+    name: "Display verbunden"
+
+  power_on:
+    name: "Heizung Ein"
+  power_off:
+    name: "Heizung Aus"
+  fan_mode:
+    name: "Nur Lüften starten"
+  fan_level:
+    name: "Lüfterstufe"
+    min_value: 0
+    max_value: 9
+    step: 1
+  set_temperature_control:
+    name: "Zieltemperatur"
+    min_value: 5
+    max_value: 40
+    step: 1
+  work_time_control:
+    name: "Arbeitszeit (min)"
+    min_value: 0
+    max_value: 255
+    step: 1
+  power_level_control:
+    name: "Leistungsstufe"
+    min_value: 0
+    max_value: 9
+    step: 1
+  temperature_source_control:
+    name: "Temperaturquelle wählen"
+  virtual_panel_temperature_control:
+    name: "Virtuelle Paneltemperatur"
+    min_value: 0
+    max_value: 40
+    step: 1
+  virtual_panel_override_switch:
+    name: "Virtuelles Panel aktivieren"
+  use_work_time_switch:
+    name: "Arbeitszeit verwenden (Schalter)"
+  wait_mode_switch:
+    name: "Warte-Modus (Schalter)"
+
+logger:
+  level: DEBUG
+```
+
+---
+
+## 🧠 UART-Kommunikation im Detail
+
+Die Kommunikation zwischen Heizung, Bedienteil und ESP32 basiert auf einem **proprietären seriellen Protokoll**, das stark an **Modbus RTU** angelehnt ist.  
+Jede Nachricht (Frame) hat folgenden Aufbau:
+
+| Byte-Index | Bedeutung | Beispielwert | Beschreibung |
+|-------------|------------|---------------|---------------|
+| 0 | Startbyte | `0xAA` | Kennzeichnet den Beginn eines Frames |
+| 1 | Gerätekennung | `0x03` / `0x04` | `0x03` = Anfrage an Heizung, `0x04` = Antwort der Heizung |
+| 2 | Länge des Payloads (in Bytes) | z. B. `0x13` | Anzahl Datenbytes zwischen Header und CRC |
+| 3 | Subadresse High | `0x00` | meist konstant |
+| 4 | Funktionscode | `0x0F`, `0x02`, `0x03`, … | bestimmt den Typ der Nachricht |
+| 5 … N−2 | Nutzdaten | – | variabel je nach Funktionscode |
+| N−2, N−1 | CRC16 (Modbus-Standard) | z. B. `0x3A 0E` | Little-Endian (`HighByte`, `LowByte`) |
+
+CRC-Berechnung erfolgt wie bei **Modbus RTU (Polynom 0xA001)**.
+
+---
+
+### 🔹 Wichtige Funktionscodes
+
+| Code (`data[4]`) | Richtung | Bedeutung / Zweck | Antwortgröße | Beschreibung |
+|------------------|-----------|------------------|---------------|---------------|
+| `0x0F` | Heizung → Display | **Statusmeldung** | 0x13 Bytes | enthält Temperaturen, Spannung, Lüfter- und Pumpenwerte sowie Statuscode |
+| `0x02` | Heizung → Display | **Einstellungen (Settings)** | 6 Bytes | liefert aktuelle Parameter wie Temp-Quelle, Solltemp, Leistung usw. |
+| `0x03` | Display → Heizung | **Power-Off-Kommando** | – | beendet Heizvorgang |
+| `0x01` | Display → Heizung | **Power-ON mit Settings** | 6 Bytes | schaltet ein und überträgt aktuelle Settings |
+| `0x11` | Display ↔ Heizung | **Panel-Temperatur (Messwert)** | 1 Byte | realer oder virtueller Panel-Sensorwert (0–255 °C) |
+| `0x23` | Display → Heizung | **Fan-Mode-Start** | 4 Bytes | aktiviert „Nur Lüften“ mit bestimmter Drehzahl |
+| `0x02` | Display → Heizung | **Settings-Schreiben** | 6 Bytes | neue Soll-Werte an Heizung übertragen |
+
+---
+
+### 🔸 Beispiel: Status-Frame (`0x0F`)
+
+**Richtung:** Heizung → Display
+
+**Beispiel (aus Log):**
 
 ```
-autoterm-air2d/
-├── air2d.yaml                       # Beispiel-ESPHome-Konfiguration
-└── components/
-    └── autoterm_uart/
-        ├── __init__.py              # Python-Binding & Konfig-Schema
-        └── autoterm_uart.h          # C++-Implementierung (Bridge + Parser)
+AA 04 13 00 0F 00 01 00 11 7F 00 84 01 24 00 00 00 00 00 00 00 00 00 65 3A 0E
 ```
+
+| Offset | Feld | Beispiel | Bedeutung |
+|---------|------|-----------|-----------|
+| 5–6 | Statuscode | `00 01` | 0x0001 = „standby“ |
+| 7 | (reserviert) | `00` | – |
+| 8 | Interne Temperatur | `11` = 17 °C |
+| 9 | Externe Temperatur | `7F` = 127 → −1 °C |
+| 10 | Spannung (high) | `00` | – |
+| 11 | Spannung (low) | `84` → 13.2 V (geteilt durch 10) |
+| 12 | Lüfter Sollwert (raw) | `01` × 60 = 60 rpm |
+| 13 | Lüfter Istwert (raw) | `24` × 60 = 2160 rpm |
+| 14 | Pumpenfrequenz (raw) | `00` → 0.00 Hz (geteilt durch 100) |
+| 15–22 | Reserviert | `00 …` | ungenutzt |
+| 23–24 | CRC16 | `3A 0E` | gültig |
+
+**Bekannte Statuscodes:**
+
+| Code | Beschreibung |
+|------|---------------|
+| `0x0001` | standby |
+| `0x0100` | cooling flame sensor |
+| `0x0101` | ventilation |
+| `0x0200` | prepare heating |
+| `0x0201` | heating glow plug |
+| `0x0202` | ignition 1 |
+| `0x0203` | ignition 2 |
+| `0x0204` | heating combustion chamber |
+| `0x0300` | heating |
+| `0x0323` | only fan |
+| `0x0304` | cooling down |
+| `0x0400` | shutting down |
+| *andere* | unknown (HEX-Code wird mit angezeigt) |
+
+---
+
+### 🔸 Beispiel: Settings-Frame (`0x02`)
+
+**Richtung:** Heizung → Display
+
+```
+AA 04 06 00 02 [use_work_time] [work_time] [temp_source] [set_temp] [wait_mode] [power_level] CRC_H CRC_L
+```
+
+**Beispiel:**
+
+```
+AA 04 06 00 02 00 78 02 0F 00 05 39 3D
+```
+
+| Byte | Bedeutung | Wert | Kommentar |
+|------|------------|------|-----------|
+| 5 | `use_work_time` | `00` | 0 = aktiv, 1 = deaktiv |
+| 6 | `work_time` | `78` (120 min) | Arbeitszeit |
+| 7 | `temperature_source` | `02` | 1 = intern, 2 = Panel, 3 = extern, 4 = keine Regelung |
+| 8 | `set_temperature` | `0F` (15 °C) | Solltemperatur |
+| 9 | `wait_mode` | `00` | 1 = Warten an, 2 = aus |
+| 10 | `power_level` | `05` (Stufe 5) | Leistungsstufe 0–9 |
+| 11–12 | CRC16 | `39 3D` | korrekt |
+
+---
+
+### 🔸 Beispiel: Panel-Temperatur-Frame (`0x11`)
+
+**Richtung:** Display → Heizung
+
+```
+AA 03 01 00 11 [temp_raw] CRC_H CRC_L
+```
+
+- `temp_raw` = 0–255 → 0–255 °C  
+- Wird alle 2 s übertragen (oder vom ESP simuliert, wenn „Virtual Panel Override“ aktiv ist)
+
+**Beispiel:**
+
+```
+AA 04 01 00 11 10 B1 E5
+```
+
+→ Temperatur 16 °C
+
+---
+
+### 🔸 Power ON / OFF
+
+**Power ON**
+
+```
+AA 03 06 00 01 [use_work_time] [work_time] [temp_src] [set_temp] [wait_mode] [power_lvl] CRC_H CRC_L
+```
+
+**Power OFF**
+
+```
+AA 03 00 00 03 CRC_H CRC_L
+```
+
+---
+
+### 🔸 Fan Mode (Nur Lüften)
+
+```
+AA 03 04 00 23 FF FF [level] FF CRC_H CRC_L
+```
+
+- Aktiviert „Fan Mode“ (nur Lüfterbetrieb)  
+- `level` = 0–9 (Leistungsstufe)
+
+**Beispiel:**
+
+```
+AA 03 04 00 23 FF FF 08 FF 1A 2B
+```
+
+---
+
+### 🔸 Anfrage-Frames vom ESP (bei fehlendem Display)
+
+Wenn der ESP kein Bedienteil erkennt, sendet er regelmäßig eigene Requests:
+
+| Funktion | Intervall | Frame | Zweck |
+|-----------|------------|--------|--------|
+| **Status-Request** | alle 2 s | `AA 03 00 00 0F CRC` | fordert aktuellen Heizstatus an |
+| **Settings-Request** | alle 10 s | `AA 03 00 00 02 CRC` | fordert aktuelle Einstellungen an |
+
+---
+
+### 🔹 Übersicht aller bekannten Telegrammtypen
+
+| Code | Richtung | Länge (Payload) | Zweck |
+|------|-----------|----------------|-------|
+| `0x0F` | Heater → Display | 19 B | Statusdaten |
+| `0x02` | Heater → Display | 6 B | Settings lesen |
+| `0x02` | Display → Heater | 6 B | Settings schreiben |
+| `0x01` | Display → Heater | 6 B | Power ON |
+| `0x03` | Display → Heater | 0 B | Power OFF |
+| `0x11` | Display → Heater | 1 B | Panel-Temperatur |
+| `0x23` | Display → Heater | 4 B | Fan Mode starten |
+
+---
+
+## 🧩 Entitäten in Home Assistant
+
+| Typ | Name | Beschreibung |
+|------|------|--------------|
+| Sensor | Interne Temperatur | Temperatursensor im Gerät |
+| Sensor | Externe Temperatur | Außentemperaturfühler |
+| Sensor | Heizkörpertemperatur | Temperatur im Wärmetauscher |
+| Sensor | Panel Temperatur | Rohwert vom Panel (oder virtuell) |
+| Sensor | Spannung | Bordnetzspannung |
+| Sensor | Lüfter Soll (rpm) | RPM × 60 |
+| Sensor | Lüfter Ist (rpm) | RPM × 60 |
+| Sensor | Pumpenfrequenz | Hz |
+| Sensor | Statuswert (numerisch) | zusammengesetzt aus High/Low |
+| Text Sensor | Heizstatus (Text) | „heating“, „standby“ etc. inkl. HEX bei unknown |
+| Text Sensor | Temperaturquelle | „internal“, „panel“, „external“, „no automatic…“ |
+| Button | Heizung Ein/Aus | Startet oder stoppt den Heizprozess |
+| Number | Zieltemperatur | Solltemperatur |
+| Number | Lüfterstufe | 0–9 (manuell) |
+| Number | Arbeitszeit | 0–255 min |
+| Number | Leistungsstufe | 0–9 |
+| Switch | Warte-Modus | 1 = on, 2 = off |
+| Switch | Virtuelles Panel Override | ESP32 simuliert Panel |
+| Select | Temperaturquelle wählen | setzt 1/2/3/4 |
+
+---
+
+## 🧑‍💻 Entwicklung & Tests
+
+Getestet mit:
+
+- **ESP32 DevKit v1**  
+- **Autoterm Air 2D**  
+- UART-Sniffer-Log zur Protokollanalyse  
+- CRC-Validierung nach Modbus-Standard  
+- ESPHome 2025.x / Home Assistant 2025.x  
 
 ---
 
 ## 🚀 Installation
 
-1. ESP32 mit **zwei UARTs** an Heizung und Bedienteil anschließen (siehe Verdrahtung).
-2. Repository in dein ESPHome-Verzeichnis kopieren (z. B. `/config/esphome/autoterm-air2d/`).
-3. `air2d.yaml` in ESPHome importieren oder als Vorlage verwenden und deine WLAN-/Domain-Secrets eintragen.
-4. Kompilieren & flashen. Nach dem Start erscheinen alle Entitäten automatisch in Home Assistant.
-5. Optional: Passe die Standardwerte (z. B. Lüfterstufe, Temperaturgrenzen) im YAML an; Defaultbereiche liefert die Komponente automatisch.
+1. Repository klonen:
+
+   ```bash
+   git clone https://github.com/<DEIN_USER>/autoterm_uart.git
+   ```
+
+2. In deiner ESPHome-YAML einbinden:
+
+   ```yaml
+   external_components:
+     - source: github://<DEIN_USER>/autoterm_uart
+   ```
+
+3. Kompilieren und auf den ESP32 flashen.
 
 ---
 
-## 🔌 Hardware-Verdrahtung
+## 🛠️ Bekannte Einschränkungen
 
-| Signal | ESP32 Pin | Beschreibung |
-|--------|-----------|--------------|
-| UART1 RX | 16 | vom Display TX |
-| UART1 TX | 17 | zum Display RX |
-| UART2 RX | 22 | von der Heizung TX |
-| UART2 TX | 23 | zur Heizung RX |
-| GND | GND | gemeinsame Masse |
-
-> ⚠️ UART-Pegel beachten – 5 V-Leitungen ggf. mit Pegelwandler anpassen.
+- Autoterm-Protokoll teilweise reverse-engineered  
+- Unbekannte Statuscodes werden als HEX angezeigt  
+- UART-Verbindungen müssen elektrisch sauber sein  
+- Fan Mode sendet aktuell nur ON, nicht OFF  
 
 ---
 
-## 🧠 Entitäten in Home Assistant
+## 📄 Lizenz
 
-### Sensoren & Text-Sensoren
-
-| Entity | Typ | Beschreibung |
-|--------|-----|--------------|
-| `sensor.autoterm_voltage` | Sensor | Bordspannung in Volt. |
-| `sensor.autoterm_heater_temperature` | Sensor | Temperatur im Heizgerät (°C). |
-| `sensor.autoterm_internal_temperature` | Sensor | Interner Sensor im Bedienteil (°C). |
-| `sensor.autoterm_external_temperature` | Sensor | Externer Temperatursensor (°C). |
-| `sensor.autoterm_fan_rpm_set` / `sensor.autoterm_fan_rpm_actual` | Sensor | Soll-/Ist-Drehzahl des Lüfters (rpm). |
-| `sensor.autoterm_pump_frequency` | Sensor | Pumpenfrequenz in Hz. |
-| `sensor.autoterm_status` | Sensor | Rohstatus als Zahl (z. B. 3.0). |
-| `text_sensor.autoterm_status_text` | Text | Menschenlesbare Statusbeschreibung (z. B. „heating“). |
-| `text_sensor.autoterm_temperature_source` | Text | Aktive Temperaturquelle als Text. |
-| `sensor.autoterm_set_temperature` | Sensor | Ausgelesene Solltemperatur (°C). |
-| `sensor.autoterm_work_time` | Sensor | Arbeitszeit (Minuten). |
-| `sensor.autoterm_power_level` | Sensor | Leistungsstufe (0–9). |
-| `sensor.autoterm_wait_mode` | Sensor | Wartebetriebsstatus (Rohwert). |
-| `sensor.autoterm_use_work_time` | Sensor | Gibt an, ob der Timer aktiv ist (0 = aktiv). |
-
-### Steuer-Entitäten
-
-| Entity | Typ | Beschreibung |
-|--------|-----|--------------|
-| `button.autoterm_einschalten` | Button | Sendet Startkommando an die Heizung (`0x01`). |
-| `button.autoterm_ausschalten` | Button | Sendet Stop (`0x03`). |
-| `button.autoterm_lueften` | Button | Aktiviert den Lüftermodus (`0x23`, Level aus Number). |
-| `number.autoterm_luefterstufe` | Number | Lüfterstufe 0–9, Standardbereich 0..9. |
-| `number.autoterm_solltemperatur` | Number | Solltemperatur 0–40 °C. |
-| `number.autoterm_arbeitszeit` | Number | Arbeitszeit 0–255 min. |
-| `number.autoterm_leistungsstufe` | Number | Leistungslevel 0–9. |
-| `select.autoterm_temperaturquelle` | Select | Wählt Temperaturquelle (intern, Panel, extern, ohne Regelung). |
-| `switch.autoterm_arbeitszeit_verwenden` | Switch | Aktiviert/deaktiviert Arbeitszeit (Switch „AN“ ⇒ `use_work_time = 0`). |
-| `switch.autoterm_wartebetrieb` | Switch | Setzt Wartebetrieb (Switch „AN“ ⇒ `wait_mode = 1`). |
-
----
-
-## 📜 Unterstützte Befehle & Statuscodes
-
-### Befehle (vom ESP gesendet)
-
-| Code | Beschreibung | Richtung |
-|------|--------------|----------|
-| `0x01` | Heizung starten (Power ON). | ESP → Heizung |
-| `0x03` | Heizung/Lüfter ausschalten (Power OFF). | ESP → Heizung |
-| `0x23` | Lüftermodus aktivieren + Stufe setzen. Level wird als Drittbyte übertragen. | ESP → Heizung |
-| `0x02` | Einstellungen anfordern (beim Start). | ESP → Heizung |
-| `0x02` | Einstellungen schreiben (use_work_time, work_time, temp_src, set_temp, wait_mode, power_level). | ESP → Heizung |
-
-### Ausgewertete Statuscodes
-
-| Code | Text | Beschreibung |
-|------|------|--------------|
-| `0x0001` | `standby` | Heizung im Bereitschaftsmodus. |
-| `0x0100` | `cooling flame sensor` | Nachlauf/Kühlung des Flammensensors. |
-| `0x0101` | `ventilation` | Lüfterbetrieb. |
-| `0x0201` – `0x0204` | `heating …` / `ignition …` | Zünd- und Aufheizphasen. |
-| `0x0300` | `heating` | Normaler Heizbetrieb. |
-| `0x0323` | `only fan` | Reiner Lüftermodus. |
-| `0x0304` | `cooling down` | Nachlauf/Abkühlung. |
-| `0x0400` | `shutting down` | Abschaltvorgang. |
-
-*(Weitere Codes werden geloggt und als `unknown` angezeigt.)*
-
----
-
-
-## 🛠️ Fehlerdiagnose & Logging
-
-- Jede empfangene Nachricht wird inkl. CRC geprüft und bei Erfolg als Hexdump geloggt – ideal zum Reverse Engineering.
-- Ungültige CRCs werden verworfen und als Warnung ausgegeben.
-
-
----
-
-## 🧰 ToDo / Nächste Schritte
-
-- [ ] ACK/Rückmeldungen für den Lüftermodus (`0x23`) auswerten.
-- [ ] Diagnose-/Fehlercodes (`0x10`) parsen und als Entities veröffentlichen.
-- [ ] Optional: Historisierung der Laufzeiten & Zündzyklen.
-
----
-
-## 🧑‍💻 Autor
-
-**Autoterm Air2D ESPHome Integration** – erstellt 2025 von Tim.
+MIT License © 2025  
+Entwickelt von **Tim**

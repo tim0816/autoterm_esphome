@@ -82,16 +82,24 @@ AA 04 13 00 0F 00 01 00 11 7F 00 84 01 24 00 00 00 00 00 00 00 00 00 65 3A 0E
 | Offset | Feld | Beispiel | Bedeutung |
 |---------|------|-----------|-----------|
 | 5–6 | Statuscode | `00 01` | 0x0001 = „standby“ |
-| 7 | (reserviert) | `00` | – |
+| 7 | - | `00` | – |
 | 8 | Interne Temperatur | `11` = 17 °C |
 | 9 | Externe Temperatur | `7F` = 127 → −1 °C |
-| 10 | Spannung (high) | `00` | – |
+| 10 | - | `00` | – |
 | 11 | Spannung (low) | `84` → 13.2 V (geteilt durch 10) |
-| 12 | Lüfter Sollwert (raw) | `01` × 60 = 60 rpm |
-| 13 | Lüfter Istwert (raw) | `24` × 60 = 2160 rpm |
-| 14 | Pumpenfrequenz (raw) | `00` → 0.00 Hz (geteilt durch 100) |
-| 15–22 | Reserviert | `00 …` | ungenutzt |
-| 23–24 | CRC16 | `3A 0E` | gültig |
+| 12 | - | `00` | – |
+| 13 | Heizung Temperatur | `00` | – |
+| 14 | - | `00` | – |
+| 15 | - | `00` | – |
+| 16 | Lüfter Sollwert (raw) | `01` × 60 = 60 rpm |
+| 17 | Lüfter Istwert (raw) | `24` × 60 = 2160 rpm |
+| 18 | - | `00` | – |
+| 19 | Pumpenfrequenz (raw) | `00` → 0.00 Hz (geteilt durch 100) |
+| 20 | - | `00` | – |
+| 21 | - | `00` | – |
+| 22 | - | `00` | – |
+| 23 | - | `64` | – |
+| 24–25 | CRC16 | `3A 0E` | gültig |
 
 **Bekannte Statuscodes:**
 

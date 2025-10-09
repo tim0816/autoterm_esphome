@@ -204,6 +204,8 @@ class AutotermUART : public Component {
   uint32_t last_status_request_millis_{0};
   uint32_t last_settings_request_millis_{0};
   bool virtual_panel_override_enabled_{false};
+  bool virtual_panel_override_user_enabled_{false};
+  bool virtual_panel_override_auto_enabled_{false};
   bool virtual_panel_value_valid_{false};
   uint8_t virtual_panel_last_raw_{0};
   float virtual_panel_last_value_c_{NAN};
@@ -334,6 +336,8 @@ class AutotermUART : public Component {
         last_settings_request_millis_ = now;
       }
     }
+
+    set_virtual_panel_override_auto(!connected);
 
     if (!connected) {
       if (now - last_status_request_millis_ >= 2000) {
@@ -476,6 +480,7 @@ public:
   bool set_temperature_source_from_string(const std::string &value);
   void set_use_work_time(bool use);
   void set_wait_mode(bool on);
+  void set_virtual_panel_override_user(bool enabled);
 
  protected:
   void request_settings();
@@ -488,6 +493,8 @@ public:
   void send_virtual_panel_temperature(float value);
   void transmit_virtual_panel_temperature_();
   void set_virtual_panel_override_enabled_(bool enabled);
+  void set_virtual_panel_override_auto(bool enabled);
+  void update_virtual_panel_override_state_();
   bool is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const;
   void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
 };
@@ -542,7 +549,7 @@ void AutotermVirtualPanelTemperatureNumber::control(float value) {
 void AutotermVirtualPanelOverrideSwitch::write_state(bool state) {
   publish_state(state);
   if (parent_)
-    parent_->set_virtual_panel_override_enabled_(state);
+    parent_->set_virtual_panel_override_user(state);
 }
 
 void AutotermTemperatureSourceSelect::control(const std::string &value) {
@@ -738,6 +745,14 @@ void AutotermUART::set_wait_mode(bool on) {
   update_settings_([on](Settings &s) { s.wait_mode = on ? 1 : 2; });
 }
 
+void AutotermUART::set_virtual_panel_override_user(bool enabled) {
+  if (virtual_panel_override_user_enabled_ == enabled)
+    return;
+
+  virtual_panel_override_user_enabled_ = enabled;
+  update_virtual_panel_override_state_();
+}
+
 void AutotermUART::send_virtual_panel_temperature(float value) {
   if (!std::isfinite(value)) {
     ESP_LOGW("autoterm_uart", "Ignoring non-finite virtual panel temperature %.2f", value);
@@ -809,6 +824,25 @@ void AutotermUART::set_virtual_panel_override_enabled_(bool enabled) {
   } else {
     display_to_heater_buffer_.clear();
   }
+}
+
+void AutotermUART::set_virtual_panel_override_auto(bool enabled) {
+  if (virtual_panel_override_auto_enabled_ == enabled)
+    return;
+
+  virtual_panel_override_auto_enabled_ = enabled;
+
+  if (enabled && !virtual_panel_value_valid_ && std::isfinite(panel_temp_last_value_c_)) {
+    ESP_LOGD("autoterm_uart", "Using last panel temperature %.2f°C for virtual override", panel_temp_last_value_c_);
+    send_virtual_panel_temperature(panel_temp_last_value_c_);
+  }
+
+  update_virtual_panel_override_state_();
+}
+
+void AutotermUART::update_virtual_panel_override_state_() {
+  bool desired = virtual_panel_override_user_enabled_ || virtual_panel_override_auto_enabled_;
+  set_virtual_panel_override_enabled_(desired);
 }
 
 bool AutotermUART::is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const {

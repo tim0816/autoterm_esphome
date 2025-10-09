@@ -38,8 +38,7 @@ Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfig
 ---
 
 ## 🧠 UART-Kommunikation im Detail
-
-Die Kommunikation zwischen Heizung, Bedienteil und ESP32 basiert auf einem **proprietären seriellen Protokoll**, das stark an **Modbus RTU** angelehnt ist.  
+ 
 Jede Nachricht (Frame) hat folgenden Aufbau:
 
 | Byte-Index | Bedeutung | Beispielwert | Beschreibung |
@@ -47,12 +46,12 @@ Jede Nachricht (Frame) hat folgenden Aufbau:
 | 0 | Startbyte | `0xAA` | Kennzeichnet den Beginn eines Frames |
 | 1 | Gerätekennung | `0x03` / `0x04` | `0x03` = Anfrage an Heizung, `0x04` = Antwort der Heizung |
 | 2 | Länge des Payloads (in Bytes) | z. B. `0x13` | Anzahl Datenbytes zwischen Header und CRC |
-| 3 | Subadresse High | `0x00` | meist konstant |
+| 3 | ? | `0x00` ||
 | 4 | Funktionscode | `0x0F`, `0x02`, `0x03`, … | bestimmt den Typ der Nachricht |
 | 5 … N−2 | Nutzdaten | – | variabel je nach Funktionscode |
-| N−2, N−1 | CRC16 (Modbus-Standard) | z. B. `0x3A 0E` | Little-Endian (`HighByte`, `LowByte`) |
+| N−2, N−1 | CRC | z. B. `0x3A 0E` ||
 
-CRC-Berechnung erfolgt wie bei **Modbus RTU (Polynom 0xA001)**.
+CRC-Berechnung siehe Quellen.
 
 ---
 

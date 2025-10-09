@@ -87,8 +87,8 @@ CRC-Berechnung siehe Quellen.
 | 9 | Externe Temperatur | `7F` = 127 → −1 °C |
 | 10 | - | `00` | – |
 | 11 | Spannung (low) | `84` → 13.2 V (geteilt durch 10) |
-| 12 | - | `00` | – |
-| 13 | Heizung Temperatur | `00` | – |
+| 12 | - | `01` | – |
+| 13 | Heizung Temperatur | `24` - 15 = 21 °C | – |
 | 14 | - | `00` | – |
 | 15 | - | `00` | – |
 | 16 | Lüfter Sollwert (raw) | `01` × 60 = 60 rpm |

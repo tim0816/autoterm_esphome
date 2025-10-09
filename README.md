@@ -76,7 +76,7 @@ CRC-Berechnung siehe Quellen.
 **Beispiel (aus Log):**
 
 ```
-AA 04 13 00 0F 00 01 00 11 7F 00 84 01 24 00 00 00 00 00 00 00 00 00 65 3A 0E
+[heater→display] Frame (26 bytes): AA 04 13 00 0F 00 01 00 11 7F 00 85 01 24 00 00 00 00 00 00 00 00 00 65 BB 0C
 ```
 
 | Offset | Feld | Beispiel | Bedeutung |

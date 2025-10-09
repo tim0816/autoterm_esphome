@@ -326,7 +326,7 @@ class AutotermUART : public Component {
     bool connected = uart_display_ != nullptr && (now - last_display_activity_) < 5000;
     if (connected != display_connected_state_) {
       display_connected_state_ = connected;
-      ESP_LOGI("autoterm_uart", "Display connection %s", connected ? "detected" : "lost");
+      ESP_LOGD("autoterm_uart", "Display connection %s", connected ? "detected" : "lost");
       if (display_connected_sensor_)
         display_connected_sensor_->publish_state(connected);
       if (connected) {
@@ -498,12 +498,12 @@ public:
 
 // Button gedrückt → Lüften aktivieren
 void AutotermPowerOnButton::press_action() {
-  ESP_LOGI("autoterm_uart", "Power ON button pressed");
+  ESP_LOGD("autoterm_uart", "Power ON button pressed");
   if (parent_) parent_->send_power_on();
 }
 
 void AutotermFanModeButton::press_action() {
-  ESP_LOGI("autoterm_uart", "Fan Mode button pressed");
+  ESP_LOGD("autoterm_uart", "Fan Mode button pressed");
   if (parent_) {
     int level = parent_->fan_level_number_ ? (int)parent_->fan_level_number_->state : 8;
     parent_->send_fan_mode(true, level);
@@ -635,7 +635,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
       break;
   }
 
-  ESP_LOGI("autoterm_uart",
+  ESP_LOGD("autoterm_uart",
            "Status: %s (0x%02X%02X) | U=%.1fV | Heater %.0f°C | Fan %.0f/%.0f rpm | Pump %.2f Hz",
            status_txt, s_hi, s_lo, voltage, heater_temp, fan_actual_rpm, fan_set_rpm, pump_freq);
 
@@ -699,7 +699,7 @@ void AutotermUART::send_fan_mode(bool on, int level) {
   uart_heater_->write_array(frame);
   uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart", "Sent Fan Mode %s, Level %d (CRC %04X)",
+  ESP_LOGD("autoterm_uart", "Sent Fan Mode %s, Level %d (CRC %04X)",
            on ? "ON" : "OFF", level, crc);
 }
 
@@ -786,7 +786,7 @@ void AutotermUART::transmit_virtual_panel_temperature_() {
   uart_heater_->write_array(frame);
   uart_heater_->flush();
 
-  ESP_LOGI("autoterm_uart",
+  ESP_LOGD("autoterm_uart",
            "Sent virtual panel temperature override %.2f°C (raw=%u, CRC %04X)",
            virtual_panel_last_value_c_, virtual_panel_last_raw_, crc);
 
@@ -798,7 +798,7 @@ void AutotermUART::set_virtual_panel_override_enabled_(bool enabled) {
     return;
 
   virtual_panel_override_enabled_ = enabled;
-  ESP_LOGI("autoterm_uart", "Virtual panel override %s", enabled ? "enabled" : "disabled");
+  ESP_LOGD("autoterm_uart", "Virtual panel override %s", enabled ? "enabled" : "disabled");
 
   if (virtual_panel_override_switch_)
     virtual_panel_override_switch_->publish_state(enabled);
@@ -978,7 +978,7 @@ uint8_t AutotermUART::temperature_source_from_string(const std::string &value) c
 }
 
 void AutotermPowerOffButton::press_action() {
-  ESP_LOGI("autoterm_uart", "Power OFF button pressed");
+  ESP_LOGD("autoterm_uart", "Power OFF button pressed");
   if (parent_) parent_->send_power_off();
 }
 

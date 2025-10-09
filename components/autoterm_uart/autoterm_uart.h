@@ -462,7 +462,7 @@ class AutotermUART : public Component {
       sprintf(temp, "%02X ", v);
       hex += temp;
     }
-    ESP_LOGD("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
+    ESP_LOGI("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
   }
 
   void parse_status(const std::vector<uint8_t> &data);

@@ -738,7 +738,7 @@ bool AutotermUART::set_temperature_source_from_string(const std::string &value) 
 }
 
 void AutotermUART::set_use_work_time(bool use) {
-  update_settings_([use](Settings &s) { s.use_work_time = use ? 0 : 1; });
+  update_settings_([use](Settings &s) { s.use_work_time = use ? 0 : 0xFF; });
 }
 
 void AutotermUART::set_wait_mode(bool on) {

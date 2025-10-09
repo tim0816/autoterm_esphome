@@ -265,6 +265,13 @@ Getestet mit:
 
 ---
 
+## 📚 Quellen & Referenzen
+
+- 🔗 [schroeder-robert / autoterm-air-2d-serial-control](https://github.com/schroeder-robert/autoterm-air-2d-serial-control)  
+  Reverse Engineering und Steuerung der Autoterm Air 2D über serielle Schnittstelle.
+
+---
+
 ## 📄 Lizenz
 
 MIT License © 2025  

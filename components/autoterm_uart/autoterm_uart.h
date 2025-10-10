@@ -73,7 +73,8 @@ class AutotermUART : public Component {
   Sensor *panel_temp_override_sensor_{nullptr};
   float panel_temp_override_value_c_{NAN};
   AutotermTempSourceSelect *temp_source_select_{nullptr};
-  uint8_t manual_temp_source_{0};
+  bool manual_temp_source_active_{false};
+  uint8_t manual_temp_source_value_{0};
 
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
@@ -120,7 +121,7 @@ class AutotermUART : public Component {
   void set_temp_source_select(AutotermTempSourceSelect *select);
   void set_temp_source_from_select(uint8_t source);
   void apply_temp_source_from_settings(uint8_t source);
-  uint8_t get_manual_temp_source() const { return manual_temp_source_; }
+  uint8_t get_manual_temp_source() const { return manual_temp_source_active_ ? manual_temp_source_value_ : 0; }
 
   // Neue Setter mit Rückreferenz
   void set_fan_level_number(AutotermFanLevelNumber *n) {
@@ -372,37 +373,29 @@ void AutotermUART::set_temp_source_select(AutotermTempSourceSelect *select) {
   temp_source_select_ = select;
   if (temp_source_select_ != nullptr) {
     temp_source_select_->set_parent(this);
-    uint8_t initial = manual_temp_source_;
-    if (initial < 1 || initial > 4) {
-      if (settings_valid_ && settings_.temperature_source >= 1 && settings_.temperature_source <= 4)
-        initial = settings_.temperature_source;
-      else
-        initial = 1;
-      manual_temp_source_ = initial;
-    }
+    uint8_t initial = manual_temp_source_active_ ? manual_temp_source_value_
+                                                : (settings_valid_ ? clamp_temp_source_(settings_.temperature_source)
+                                                                   : static_cast<uint8_t>(1));
     publish_temp_source_select_(initial);
   }
 }
 
 void AutotermUART::set_temp_source_from_select(uint8_t source) {
   uint8_t clamped = clamp_temp_source_(source);
-  bool changed = manual_temp_source_ != clamped;
-  manual_temp_source_ = clamped;
-  settings_.temperature_source = clamped;
-  settings_valid_ = true;
+  bool changed = !manual_temp_source_active_ || manual_temp_source_value_ != clamped;
+  manual_temp_source_active_ = true;
+  manual_temp_source_value_ = clamped;
   publish_temp_source_select_(clamped);
   if (changed) {
     ESP_LOGI("autoterm_uart", "Temperature source set via select to %u", static_cast<unsigned>(clamped));
-    if (climate_ != nullptr)
-      climate_->handle_settings_update(settings_, true);
   }
 }
 
 void AutotermUART::apply_temp_source_from_settings(uint8_t source) {
   uint8_t clamped = clamp_temp_source_(source);
-  manual_temp_source_ = clamped;
   settings_.temperature_source = clamped;
-  publish_temp_source_select_(clamped);
+  if (!manual_temp_source_active_)
+    publish_temp_source_select_(clamped);
 }
 
 void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display) {
@@ -463,7 +456,7 @@ uint8_t AutotermUART::clamp_temp_source_(uint8_t source) const {
 }
 
 bool AutotermUART::should_force_temp_source_() const {
-  return manual_temp_source_ >= 1 && manual_temp_source_ <= 4;
+  return manual_temp_source_active_ && manual_temp_source_value_ >= 1 && manual_temp_source_value_ <= 4;
 }
 
 void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
@@ -479,7 +472,7 @@ void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
   size_t payload_index = 5;
   if (frame.size() <= payload_index + 2)
     return;
-  uint8_t desired = clamp_temp_source_(manual_temp_source_);
+  uint8_t desired = clamp_temp_source_(manual_temp_source_value_);
   uint8_t current = frame[payload_index + 2];
   if (current == desired)
     return;
@@ -493,8 +486,8 @@ bool AutotermUART::should_override_panel_temperature_() const {
   if (!std::isfinite(panel_temp_override_value_c_))
     return false;
   uint8_t source = 0;
-  if (manual_temp_source_ >= 1 && manual_temp_source_ <= 4)
-    source = manual_temp_source_;
+  if (manual_temp_source_active_ && manual_temp_source_value_ >= 1 && manual_temp_source_value_ <= 4)
+    source = manual_temp_source_value_;
   else if (settings_valid_)
     source = settings_.temperature_source;
   if (source != 4)

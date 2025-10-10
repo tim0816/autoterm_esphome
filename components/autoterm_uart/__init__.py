@@ -9,7 +9,7 @@ import esphome.components.climate as climate
 import esphome.components.select as select
 
 DEPENDENCIES = ["sensor", "text_sensor", "number", "climate"]
-AUTO_LOAD = ["sensor", "text_sensor", "number", "climate"]
+AUTO_LOAD = ["sensor", "text_sensor", "number", "climate", "select"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)

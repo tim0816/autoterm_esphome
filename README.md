@@ -1,5 +1,7 @@
 # 🔥 Autoterm UART Bridge für ESPHome
 
+Das ist ein Test
+
 Dieses Projekt implementiert eine vollständige **UART-Bridge zwischen Autoterm/Planar-Heizungen und dem Bedienteil**, mit Integration in **ESPHome** und damit Home Assistant.  
 Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT oder Home Assistant Entities.
 

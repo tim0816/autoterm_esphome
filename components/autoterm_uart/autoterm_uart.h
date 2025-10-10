@@ -75,6 +75,8 @@ class AutotermUART : public Component {
   AutotermTempSourceSelect *temp_source_select_{nullptr};
   bool manual_temp_source_active_{false};
   uint8_t manual_temp_source_value_{0};
+  float last_internal_temp_c_{NAN};
+  float last_external_temp_c_{NAN};
 
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
@@ -122,6 +124,8 @@ class AutotermUART : public Component {
   void set_temp_source_from_select(uint8_t source);
   void apply_temp_source_from_settings(uint8_t source);
   uint8_t get_manual_temp_source() const { return manual_temp_source_active_ ? manual_temp_source_value_ : 0; }
+  uint8_t get_effective_temp_source() const;
+  float get_temperature_for_source(uint8_t source) const;
 
   // Neue Setter mit Rückreferenz
   void set_fan_level_number(AutotermFanLevelNumber *n) {
@@ -400,6 +404,45 @@ void AutotermUART::apply_temp_source_from_settings(uint8_t source) {
     publish_temp_source_select_(clamped);
 }
 
+uint8_t AutotermUART::get_effective_temp_source() const {
+  if (manual_temp_source_active_ && manual_temp_source_value_ >= 1 && manual_temp_source_value_ <= 4)
+    return manual_temp_source_value_;
+  if (settings_valid_)
+    return clamp_temp_source_(settings_.temperature_source);
+  return 1;
+}
+
+float AutotermUART::get_temperature_for_source(uint8_t source) const {
+  uint8_t clamped = clamp_temp_source_(source);
+  float value = NAN;
+  switch (clamped) {
+    case 1:
+      value = last_internal_temp_c_;
+      break;
+    case 2:
+      value = panel_temp_last_value_c_;
+      break;
+    case 3:
+      value = last_external_temp_c_;
+      break;
+    case 4:
+      value = panel_temp_override_value_c_;
+      break;
+    default:
+      value = last_internal_temp_c_;
+      break;
+  }
+  if (std::isfinite(value))
+    return value;
+  if (std::isfinite(last_internal_temp_c_))
+    return last_internal_temp_c_;
+  if (std::isfinite(panel_temp_last_value_c_))
+    return panel_temp_last_value_c_;
+  if (std::isfinite(last_external_temp_c_))
+    return last_external_temp_c_;
+  return NAN;
+}
+
 void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display) {
   if (frame.empty())
     return;
@@ -592,6 +635,10 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   if (internal_temp_sensor_) internal_temp_sensor_->publish_state(internal_temp);
   if (external_temp_sensor_) external_temp_sensor_->publish_state(external_temp);
   if (heater_temp_sensor_) heater_temp_sensor_->publish_state(heater_temp);
+
+  last_internal_temp_c_ = internal_temp;
+  last_external_temp_c_ = external_temp;
+
   if (voltage_sensor_) voltage_sensor_->publish_state(voltage);
   if (status_sensor_) status_sensor_->publish_state(status_val);
   if (status_text_sensor_) status_text_sensor_->publish_state(status_txt);
@@ -936,10 +983,18 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
 
 void AutotermClimate::handle_status_update(uint16_t status_code, float internal_temp) {
   bool changed = false;
-  if (!std::isnan(internal_temp)) {
-    if (std::isnan(current_temperature_c_) || std::fabs(internal_temp - current_temperature_c_) > 0.1f) {
-      current_temperature_c_ = internal_temp;
-      this->current_temperature = internal_temp;
+  float display_temp = internal_temp;
+  if (parent_ != nullptr) {
+    uint8_t source = parent_->get_effective_temp_source();
+    float resolved = parent_->get_temperature_for_source(source);
+    if (std::isfinite(resolved))
+      display_temp = resolved;
+  }
+
+  if (!std::isnan(display_temp)) {
+    if (std::isnan(current_temperature_c_) || std::fabs(display_temp - current_temperature_c_) > 0.1f) {
+      current_temperature_c_ = display_temp;
+      this->current_temperature = display_temp;
       changed = true;
     }
   }

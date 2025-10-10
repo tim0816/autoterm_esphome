@@ -20,11 +20,7 @@ CONF_DEFAULT_LEVEL = "default_level"
 CONF_DEFAULT_TEMPERATURE = "default_temperature"
 CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
 
-CLIMATE_SCHEMA = climate.climate_schema(
-    AutotermClimate,
-    icon=cv.icon,
-    default_preset=None,
-).extend({
+CLIMATE_SCHEMA = climate.climate_schema(AutotermClimate).extend({
     cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
     cv.Optional(CONF_DEFAULT_TEMPERATURE, default=20.0): cv.temperature,
     cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=2): cv.int_range(min=1, max=3),

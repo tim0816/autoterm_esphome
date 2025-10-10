@@ -169,7 +169,7 @@ class AutotermUART : public Component {
               handle_panel_temperature_frame_(buffer);
             log_frame(tag, buffer);
             parse_status(buffer);
-            parse_settings(buffer);
+            parse_settings(buffer, from_display);
           } else {
             ESP_LOGW("autoterm_uart", "[%s] CRC falsch, verworfen", tag);
           }
@@ -200,7 +200,7 @@ class AutotermUART : public Component {
   }
 
   void parse_status(const std::vector<uint8_t> &data);
-  void parse_settings(const std::vector<uint8_t> &data);
+  void parse_settings(const std::vector<uint8_t> &data, bool from_display);
 public:
   void send_fan_mode(bool on, int level);
 
@@ -225,7 +225,7 @@ class AutotermClimate : public climate::Climate {
   void set_default_temp_sensor(uint8_t sensor);
 
   void handle_status_update(uint16_t status_code, float internal_temp);
-  void handle_settings_update(const AutotermUART::Settings &settings);
+  void handle_settings_update(const AutotermUART::Settings &settings, bool from_display);
 
  protected:
   climate::ClimateTraits traits() override;
@@ -348,7 +348,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   if (climate_) climate_->handle_status_update(status_code, internal_temp);
 }
 
-void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
+void AutotermUART::parse_settings(const std::vector<uint8_t> &data, bool from_display) {
   if (data.size() < 13) return;
   if (data.size() >= 5 && data[1] == 0x04 && data[4] == 0x02) {
     const uint8_t *p = &data[5];
@@ -371,7 +371,7 @@ void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
     s.power_level = power_level;
     settings_ = s;
     settings_valid_ = true;
-    if (climate_) climate_->handle_settings_update(settings_);
+    if (climate_) climate_->handle_settings_update(settings_, from_display);
   }
 }
 
@@ -671,7 +671,9 @@ void AutotermClimate::handle_status_update(uint16_t status_code, float internal_
     this->publish_state();
 }
 
-void AutotermClimate::handle_settings_update(const AutotermUART::Settings &settings) {
+void AutotermClimate::handle_settings_update(const AutotermUART::Settings &settings, bool from_display) {
+  if (!from_display)
+    return;
   uint8_t level = clamp_level_(settings.power_level);
   float target = clamp_temperature_(static_cast<float>(settings.set_temperature));
   std::string preset = deduce_preset_from_settings_(settings);
@@ -874,7 +876,7 @@ void AutotermUART::set_climate(AutotermClimate *climate) {
   if (climate_ != nullptr) {
     climate_->set_parent(this);
     if (settings_valid_)
-      climate_->handle_settings_update(settings_);
+      climate_->handle_settings_update(settings_, false);
   }
 }
 

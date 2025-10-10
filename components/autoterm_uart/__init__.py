@@ -93,7 +93,7 @@ async def to_code(config):
     if CONF_CLIMATE in config:
         climate_conf = config[CONF_CLIMATE]
         clim = cg.new_Pvariable(climate_conf[const.CONF_ID])
-        await cg.register_component(clim, climate_conf)
+       # await cg.register_component(clim, climate_conf)
         await climate.register_climate(clim, climate_conf)
         cg.add(clim.set_default_level(climate_conf[CONF_DEFAULT_LEVEL]))
         cg.add(clim.set_default_temperature(climate_conf[CONF_DEFAULT_TEMPERATURE]))

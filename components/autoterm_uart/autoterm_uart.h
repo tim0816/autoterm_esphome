@@ -287,7 +287,7 @@ class AutotermClimate : public climate::Climate {
   float current_temperature_c_{NAN};
   uint8_t fan_level_{4};
   uint8_t default_temp_sensor_{0x01};
-  std::string preset_mode_{"power"};
+  std::string preset_mode_{"Leistungsmodus"};
 
   static uint8_t clamp_level_(int level);
   static float clamp_temperature_(float temperature);
@@ -796,21 +796,21 @@ void AutotermUART::send_standby() {
 void AutotermUART::send_power_mode(bool start, uint8_t level) {
   uint8_t clamped_level = std::min<uint8_t>(level, 9);
   std::vector<uint8_t> payload{0xFF, 0xFF, 0x04, 0xFF, 0x02, clamped_level};
-  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.power.start" : "mode.power.set");
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.leistungsmodus.start" : "mode.leistungsmodus.set");
 }
 
 void AutotermUART::send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
   uint8_t sensor = map_source_to_heater_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x02, 0xFF};
-  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_hold.start" : "mode.temp_hold.set");
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.heizen.start" : "mode.heizen.set");
 }
 
 void AutotermUART::send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
   uint8_t sensor = map_source_to_heater_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x01, 0xFF};
-  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_to_fan.start" : "mode.temp_to_fan.set");
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.heizen_plus_lueften.start" : "mode.heizen_plus_lueften.set");
 }
 
 void AutotermUART::send_fan_only(uint8_t level) {
@@ -896,10 +896,10 @@ climate::ClimateTraits AutotermClimate::traits() {
       climate::CLIMATE_MODE_AUTO,
   });
   std::set<std::string> presets;
-  presets.insert("power");
-  presets.insert("temp_hold");
-  presets.insert("temp_to_fan");
-  presets.insert("thermostat");
+  presets.insert("Leistungsmodus");
+  presets.insert("Heizen");
+  presets.insert("Heizen+Lüften");
+  presets.insert("Thermostat");
   traits.set_supported_custom_presets(std::move(presets));
   std::set<std::string> fan_modes;
   for (int i = 0; i <= 9; i++)
@@ -930,17 +930,17 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
   if (!preset_overridden) {
     switch (new_mode) {
       case climate::CLIMATE_MODE_HEAT:
-        new_preset = "temp_hold";
+        new_preset = "Heizen";
         break;
       case climate::CLIMATE_MODE_AUTO:
-        new_preset = "temp_to_fan";
+        new_preset = "Heizen+Lüften";
         break;
       case climate::CLIMATE_MODE_FAN_ONLY:
       case climate::CLIMATE_MODE_OFF:
         new_preset.clear();
         break;
       default:
-        new_preset = "power";
+        new_preset = "Leistungsmodus";
         break;
     }
     if (!new_preset.empty())
@@ -982,17 +982,17 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
     if (previous_mode == climate::CLIMATE_MODE_FAN_ONLY)
       parent_->send_standby();
 
-    if (new_preset == "power") {
+    if (new_preset == "Leistungsmodus") {
       parent_->send_power_mode(should_start, new_level);
-    } else if (new_preset == "temp_hold") {
+    } else if (new_preset == "Heizen") {
       uint8_t sensor = resolve_temp_sensor_();
       uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
       parent_->send_temperature_hold_mode(should_start, sensor, temp_byte);
-    } else if (new_preset == "temp_to_fan") {
+    } else if (new_preset == "Heizen+Lüften") {
       uint8_t sensor = resolve_temp_sensor_();
       uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
       parent_->send_temperature_to_fan_mode(should_start, sensor, temp_byte);
-    } else if (new_preset == "thermostat") {
+    } else if (new_preset == "Thermostat") {
       parent_->send_thermostat_placeholder();
     }
   }
@@ -1075,7 +1075,7 @@ uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) cons
 }
 
 std::string AutotermClimate::sanitize_preset_(const std::string &preset) const {
-  if (preset == "power" || preset == "temp_hold" || preset == "temp_to_fan" || preset == "thermostat")
+  if (preset == "Leistungsmodus" || preset == "Heizen" || preset == "Heizen+Lüften" || preset == "Thermostat")
     return preset;
   return preset_mode_;
 }
@@ -1113,29 +1113,29 @@ climate::ClimateMode AutotermClimate::deduce_mode_from_settings_(const AutotermU
 
 std::string AutotermClimate::deduce_preset_from_settings_(const AutotermUART::Settings &settings) const {
   if (settings.temperature_source == 0x04)
-    return "power";
+    return "Leistungsmodus";
   if (settings.wait_mode == 0x01)
-    return "temp_to_fan";
+    return "Heizen+Lüften";
   if (settings.wait_mode == 0x02)
-    return "temp_hold";
+    return "Heizen";
   return preset_mode_;
 }
 
 std::string AutotermClimate::preset_from_enum_(climate::ClimatePreset preset) {
   switch (preset) {
     case climate::CLIMATE_PRESET_NONE:
-      return "power";
+      return "Leistungsmodus";
     case climate::CLIMATE_PRESET_HOME:
     case climate::CLIMATE_PRESET_COMFORT:
     case climate::CLIMATE_PRESET_SLEEP:
-      return "temp_hold";
+      return "Heizen";
     case climate::CLIMATE_PRESET_AWAY:
     case climate::CLIMATE_PRESET_ACTIVITY:
-      return "temp_to_fan";
+      return "Heizen+Lüften";
     case climate::CLIMATE_PRESET_BOOST:
-      return "power";
+      return "Leistungsmodus";
     case climate::CLIMATE_PRESET_ECO:
-      return "thermostat";
+      return "Thermostat";
     default:
       return "";
   }

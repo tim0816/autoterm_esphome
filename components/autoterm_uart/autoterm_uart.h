@@ -5,12 +5,15 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/climate/climate.h"
+#include "esphome/core/optional.h"
 #include "esphome/core/time.h"
-#include <vector>
-#include <string>
-#include <cmath>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <utility>
+#include <set>
+#include <string>
+#include <vector>
 
 namespace esphome {
 namespace autoterm_uart {
@@ -236,17 +239,17 @@ class AutotermClimate : public climate::Climate {
   float current_temperature_c_{NAN};
   uint8_t fan_level_{4};
   uint8_t default_temp_sensor_{0x01};
-  std::string preset_mode_{"power"};
+  climate::ClimatePreset preset_mode_{"power"};
 
   static uint8_t clamp_level_(int level);
   static float clamp_temperature_(float temperature);
-  std::string fan_mode_label_from_level_(uint8_t level) const;
-  uint8_t fan_mode_label_to_level_(const std::string &label) const;
-  std::string sanitize_preset_(const std::string &preset) const;
+  climate::ClimateFanMode fan_mode_from_level_(uint8_t level) const;
+  uint8_t fan_mode_to_level_(const climate::ClimateFanMode &mode) const;
+  climate::ClimatePreset sanitize_preset_(const climate::ClimatePreset &preset) const;
   uint8_t resolve_temp_sensor_() const;
   climate::ClimateMode deduce_mode_from_settings_(const AutotermUART::Settings &settings) const;
-  std::string deduce_preset_from_settings_(const AutotermUART::Settings &settings) const;
-  void apply_state_(climate::ClimateMode mode, const std::string &preset, uint8_t level, float target_temp);
+  climate::ClimatePreset deduce_preset_from_settings_(const AutotermUART::Settings &settings) const;
+  void apply_state_(climate::ClimateMode mode, const climate::ClimatePreset &preset, uint8_t level, float target_temp);
   void update_action_from_status_(uint16_t status_code);
 };
 
@@ -518,21 +521,21 @@ void AutotermClimate::set_parent(AutotermUART *parent) {
   parent_ = parent;
   this->mode = climate::CLIMATE_MODE_OFF;
   this->action = climate::CLIMATE_ACTION_OFF;
-  this->fan_mode = fan_mode_label_from_level_(fan_level_);
-  this->preset = preset_mode_;
-  this->target_temperature = target_temperature_c_;
+  this->fan_mode = optional<climate::ClimateFanMode>(fan_mode_from_level_(fan_level_));
+  this->preset = optional<climate::ClimatePreset>(preset_mode_);
+  this->target_temperature = optional<float>(target_temperature_c_);
   if (!std::isnan(current_temperature_c_))
-    this->current_temperature = current_temperature_c_;
+    this->current_temperature = optional<float>(current_temperature_c_);
 }
 
 void AutotermClimate::set_default_level(uint8_t level) {
   fan_level_ = clamp_level_(level);
-  this->fan_mode = fan_mode_label_from_level_(fan_level_);
+  this->fan_mode = optional<climate::ClimateFanMode>(fan_mode_from_level_(fan_level_));
 }
 
 void AutotermClimate::set_default_temperature(float temperature_c) {
   target_temperature_c_ = clamp_temperature_(temperature_c);
-  this->target_temperature = target_temperature_c_;
+  this->target_temperature = optional<float>(target_temperature_c_);
 }
 
 void AutotermClimate::set_default_temp_sensor(uint8_t sensor) {
@@ -547,12 +550,16 @@ climate::ClimateTraits AutotermClimate::traits() {
       climate::CLIMATE_MODE_FAN_ONLY,
       climate::CLIMATE_MODE_AUTO,
   });
-  traits.set_supported_presets({"power", "temp_hold", "temp_to_fan", "thermostat"});
-  std::vector<std::string> fan_modes;
-  fan_modes.reserve(10);
+  std::set<climate::ClimatePreset> presets;
+  presets.insert(climate::ClimatePreset("power"));
+  presets.insert(climate::ClimatePreset("temp_hold"));
+  presets.insert(climate::ClimatePreset("temp_to_fan"));
+  presets.insert(climate::ClimatePreset("thermostat"));
+  traits.set_supported_presets(std::move(presets));
+  std::set<climate::ClimateFanMode> fan_modes;
   for (int i = 1; i <= 10; i++)
-    fan_modes.emplace_back(std::to_string(i));
-  traits.set_supported_fan_modes(fan_modes);
+    fan_modes.insert(climate::ClimateFanMode(std::to_string(i)));
+  traits.set_supported_fan_modes(std::move(fan_modes));
   traits.set_visual_min_temperature(0.0f);
   traits.set_visual_max_temperature(30.0f);
   traits.set_visual_temperature_step(1.0f);
@@ -561,17 +568,17 @@ climate::ClimateTraits AutotermClimate::traits() {
 }
 
 void AutotermClimate::control(const climate::ClimateCall &call) {
-  climate::ClimateMode new_mode = this->mode.value_or(climate::CLIMATE_MODE_OFF);
+  climate::ClimateMode new_mode = this->mode;
   if (call.get_mode().has_value())
     new_mode = *call.get_mode();
 
-  std::string new_preset = preset_mode_;
+  climate::ClimatePreset new_preset = preset_mode_;
   if (call.get_preset().has_value())
     new_preset = sanitize_preset_(*call.get_preset());
 
   uint8_t new_level = fan_level_;
   if (call.get_fan_mode().has_value())
-    new_level = fan_mode_label_to_level_(*call.get_fan_mode());
+    new_level = fan_mode_to_level_(*call.get_fan_mode());
   new_level = clamp_level_(new_level);
 
   float new_target_temp = target_temperature_c_;
@@ -587,7 +594,7 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
     return;
   }
 
-  climate::ClimateMode previous_mode = this->mode.value_or(climate::CLIMATE_MODE_OFF);
+  climate::ClimateMode previous_mode = this->mode;
   bool should_start = previous_mode == climate::CLIMATE_MODE_OFF ||
                       previous_mode == climate::CLIMATE_MODE_FAN_ONLY ||
                       !parent_->settings_valid_;
@@ -625,14 +632,14 @@ void AutotermClimate::handle_status_update(uint16_t status_code, float internal_
   if (!std::isnan(internal_temp)) {
     if (std::isnan(current_temperature_c_) || std::fabs(internal_temp - current_temperature_c_) > 0.1f) {
       current_temperature_c_ = internal_temp;
-      this->current_temperature = internal_temp;
+      this->current_temperature = optional<float>(internal_temp);
       changed = true;
     }
   }
 
-  auto previous_action = this->action;
+  climate::ClimateAction previous_action = this->action;
   update_action_from_status_(status_code);
-  if (!previous_action.has_value() || this->action != previous_action)
+  if (this->action != previous_action)
     changed = true;
 
   if (changed)
@@ -642,7 +649,7 @@ void AutotermClimate::handle_status_update(uint16_t status_code, float internal_
 void AutotermClimate::handle_settings_update(const AutotermUART::Settings &settings) {
   uint8_t level = clamp_level_(settings.power_level);
   float target = clamp_temperature_(static_cast<float>(settings.set_temperature));
-  std::string preset = deduce_preset_from_settings_(settings);
+  climate::ClimatePreset preset = deduce_preset_from_settings_(settings);
   climate::ClimateMode mode = deduce_mode_from_settings_(settings);
   apply_state_(mode, preset, level, target);
 }
@@ -663,16 +670,16 @@ float AutotermClimate::clamp_temperature_(float temperature) {
   return temperature;
 }
 
-std::string AutotermClimate::fan_mode_label_from_level_(uint8_t level) const {
+climate::ClimateFanMode AutotermClimate::fan_mode_from_level_(uint8_t level) const {
   level = clamp_level_(level);
-  return std::to_string(static_cast<int>(level) + 1);
+  return climate::ClimateFanMode(std::to_string(static_cast<int>(level) + 1));
 }
 
-uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) const {
-  if (label.empty())
+uint8_t AutotermClimate::fan_mode_to_level_(const climate::ClimateFanMode &mode) const {
+  if (mode.empty())
     return fan_level_;
   int value = 0;
-  for (char c : label) {
+  for (char c : mode) {
     if (!std::isdigit(static_cast<unsigned char>(c)))
       return fan_level_;
     value = value * 10 + (c - '0');
@@ -682,7 +689,7 @@ uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) cons
   return clamp_level_(value - 1);
 }
 
-std::string AutotermClimate::sanitize_preset_(const std::string &preset) const {
+climate::ClimatePreset AutotermClimate::sanitize_preset_(const climate::ClimatePreset &preset) const {
   if (preset == "power" || preset == "temp_hold" || preset == "temp_to_fan" || preset == "thermostat")
     return preset;
   return preset_mode_;
@@ -706,30 +713,30 @@ climate::ClimateMode AutotermClimate::deduce_mode_from_settings_(const AutotermU
     return climate::CLIMATE_MODE_AUTO;
   if (settings.wait_mode == 0x02)
     return climate::CLIMATE_MODE_HEAT;
-  return this->mode.value_or(climate::CLIMATE_MODE_OFF);
+  return this->mode;
 }
 
-std::string AutotermClimate::deduce_preset_from_settings_(const AutotermUART::Settings &settings) const {
+climate::ClimatePreset AutotermClimate::deduce_preset_from_settings_(const AutotermUART::Settings &settings) const {
   if (settings.temperature_source == 0x04)
-    return "power";
+    return climate::ClimatePreset("power");
   if (settings.wait_mode == 0x01)
-    return "temp_to_fan";
+    return climate::ClimatePreset("temp_to_fan");
   if (settings.wait_mode == 0x02)
-    return "temp_hold";
+    return climate::ClimatePreset("temp_hold");
   return preset_mode_;
 }
 
-void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string &preset, uint8_t level, float target_temp) {
+void AutotermClimate::apply_state_(climate::ClimateMode mode, const climate::ClimatePreset &preset, uint8_t level, float target_temp) {
   preset_mode_ = sanitize_preset_(preset);
   fan_level_ = clamp_level_(level);
   target_temperature_c_ = clamp_temperature_(target_temp);
 
   this->mode = mode;
-  this->preset = preset_mode_;
-  this->fan_mode = fan_mode_label_from_level_(fan_level_);
-  this->target_temperature = target_temperature_c_;
+  this->preset = optional<climate::ClimatePreset>(preset_mode_);
+  this->fan_mode = optional<climate::ClimateFanMode>(fan_mode_from_level_(fan_level_));
+  this->target_temperature = optional<float>(target_temperature_c_);
   if (!std::isnan(current_temperature_c_))
-    this->current_temperature = current_temperature_c_;
+    this->current_temperature = optional<float>(current_temperature_c_);
 
   if (mode == climate::CLIMATE_MODE_OFF)
     this->action = climate::CLIMATE_ACTION_OFF;
@@ -746,9 +753,8 @@ void AutotermClimate::update_action_from_status_(uint16_t status_code) {
   switch (status_code) {
     case 0x0000:
     case 0x0001:
-      action = this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_OFF
-                   ? climate::CLIMATE_ACTION_OFF
-                   : climate::CLIMATE_ACTION_IDLE;
+      action = this->mode == climate::CLIMATE_MODE_OFF ? climate::CLIMATE_ACTION_OFF
+                                                       : climate::CLIMATE_ACTION_IDLE;
       break;
     case 0x0101:
     case 0x0323:
@@ -767,9 +773,9 @@ void AutotermClimate::update_action_from_status_(uint16_t status_code) {
       action = climate::CLIMATE_ACTION_IDLE;
       break;
     default:
-      if (this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_OFF)
+      if (this->mode == climate::CLIMATE_MODE_OFF)
         action = climate::CLIMATE_ACTION_OFF;
-      else if (this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_FAN_ONLY)
+      else if (this->mode == climate::CLIMATE_MODE_FAN_ONLY)
         action = climate::CLIMATE_ACTION_FAN;
       else
         action = climate::CLIMATE_ACTION_IDLE;

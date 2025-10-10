@@ -261,7 +261,7 @@ public:
   void publish_temp_source_select_(uint8_t source);
   uint8_t clamp_temp_source_(uint8_t source) const;
   bool should_force_temp_source_() const;
-  uint8_t map_manual_source_to_heater_(uint8_t source) const;
+  uint8_t map_source_to_heater_(uint8_t source) const;
 };
 
 // ===================
@@ -505,7 +505,7 @@ bool AutotermUART::should_force_temp_source_() const {
   return manual_temp_source_active_ && manual_temp_source_value_ >= 1 && manual_temp_source_value_ <= 4;
 }
 
-uint8_t AutotermUART::map_manual_source_to_heater_(uint8_t source) const {
+uint8_t AutotermUART::map_source_to_heater_(uint8_t source) const {
   switch (clamp_temp_source_(source)) {
     case 1:
       return 0x01;
@@ -533,7 +533,7 @@ void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
   size_t payload_index = 5;
   if (frame.size() <= payload_index + 2)
     return;
-  uint8_t desired = map_manual_source_to_heater_(manual_temp_source_value_);
+  uint8_t desired = map_source_to_heater_(manual_temp_source_value_);
   uint8_t current = frame[payload_index + 2];
   if (current == desired)
     return;
@@ -797,14 +797,14 @@ void AutotermUART::send_power_mode(bool start, uint8_t level) {
 }
 
 void AutotermUART::send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
-  uint8_t sensor = clamp_temp_source_(temp_sensor);
+  uint8_t sensor = map_source_to_heater_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x02, 0xFF};
   send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_hold.start" : "mode.temp_hold.set");
 }
 
 void AutotermUART::send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
-  uint8_t sensor = clamp_temp_source_(temp_sensor);
+  uint8_t sensor = map_source_to_heater_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x01, 0xFF};
   send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_to_fan.start" : "mode.temp_to_fan.set");

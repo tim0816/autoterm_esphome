@@ -119,11 +119,10 @@ class AutotermUART : public Component {
   void send_thermostat_placeholder();
 
   void loop() override {
-    uint32_t now = millis();
-
     forward_and_sniff(uart_display_, uart_heater_, "display→heater", true);
     forward_and_sniff(uart_heater_, uart_display_, "heater→display");
 
+    uint32_t now = millis();
     bool connected = uart_display_ != nullptr && (now - last_display_activity_) < 5000;
     if (connected != display_connected_state_) {
       display_connected_state_ = connected;

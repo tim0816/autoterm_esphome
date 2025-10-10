@@ -809,6 +809,11 @@ void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string 
 
   this->mode = mode;
   this->preset.reset();
+  if (mode != climate::CLIMATE_MODE_FAN_ONLY && !preset_mode_.empty())
+    this->custom_preset = preset_mode_;
+  else
+    this->custom_preset.reset();
+  
   if (!preset_mode_.empty())
     this->custom_preset = preset_mode_;
   else

@@ -5,7 +5,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/climate/climate.h"
-#include "esphome/components/switch/switch.h"
+#include "esphome/components/select/select.h"
 #include "esphome/core/time.h"
 #include <algorithm>
 #include <cctype>
@@ -35,10 +35,27 @@ class AutotermFanLevelNumber : public number::Number {
   void control(float value) override;  // Implementierung folgt unten
 };
 
+class AutotermTempSourceSelect : public select::Select {
+ public:
+  void set_parent(AutotermUART *parent) { parent_ = parent; }
+  void publish_for_source(uint8_t source);
+
+ protected:
+  select::SelectTraits traits() override;
+  void control(const std::string &value) override;
+
+ private:
+  AutotermUART *parent_{nullptr};
+  const char *option_from_source_(uint8_t source) const;
+  uint8_t source_from_option_(const std::string &option) const;
+};
+
 // ===================
 // Hauptklasse UART
 // ===================
 class AutotermUART : public Component {
+  friend class AutotermTempSourceSelect;
+
  public:
   UARTComponent *uart_display_{nullptr};
   UARTComponent *uart_heater_{nullptr};
@@ -55,9 +72,9 @@ class AutotermUART : public Component {
   Sensor *pump_frequency_sensor_{nullptr};
   text_sensor::TextSensor *status_text_sensor_{nullptr};
   Sensor *panel_temp_override_sensor_{nullptr};
-  switch_::Switch *panel_temp_override_switch_{nullptr};
   float panel_temp_override_value_c_{NAN};
-  bool panel_temp_override_switch_state_{false};
+  AutotermTempSourceSelect *temp_source_select_{nullptr};
+  uint8_t manual_temp_source_{0};
 
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
@@ -101,7 +118,10 @@ class AutotermUART : public Component {
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
 
   void set_panel_temp_override_sensor(Sensor *s);
-  void set_panel_temp_override_switch(switch_::Switch *sw);
+  void set_temp_source_select(AutotermTempSourceSelect *select);
+  void set_temp_source_from_select(uint8_t source);
+  void apply_temp_source_from_settings(uint8_t source);
+  uint8_t get_manual_temp_source() const { return manual_temp_source_; }
 
   // Neue Setter mit Rückreferenz
   void set_fan_level_number(AutotermFanLevelNumber *n) {
@@ -227,11 +247,16 @@ public:
   void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
   void process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display);
   bool should_override_panel_temperature_() const;
+  void apply_temp_source_override_(std::vector<uint8_t> &frame);
   uint8_t compute_override_temperature_byte_() const;
   void update_crc_(std::vector<uint8_t> &frame);
   bool send_command_(uint8_t command, const std::vector<uint8_t> &payload, const char *log_label);
   uint16_t append_crc_(std::vector<uint8_t> &frame);
   static uint16_t crc16_modbus_(const uint8_t *data, size_t length);
+
+  void publish_temp_source_select_(uint8_t source);
+  uint8_t clamp_temp_source_(uint8_t source) const;
+  bool should_force_temp_source_() const;
 };
 
 // ===================
@@ -283,6 +308,57 @@ void AutotermFanLevelNumber::control(float value) {
   if (parent_) parent_->send_fan_mode(true, (int)value);
 }
 
+select::SelectTraits AutotermTempSourceSelect::traits() {
+  select::SelectTraits traits;
+  traits.set_options({"Intern", "Panel", "Extern", "Home Assistant"});
+  return traits;
+}
+
+const char *AutotermTempSourceSelect::option_from_source_(uint8_t source) const {
+  switch (source) {
+    case 1:
+      return "Intern";
+    case 2:
+      return "Panel";
+    case 3:
+      return "Extern";
+    case 4:
+      return "Home Assistant";
+    default:
+      return "Intern";
+  }
+}
+
+uint8_t AutotermTempSourceSelect::source_from_option_(const std::string &option) const {
+  if (option == "Intern" || option == "1")
+    return 1;
+  if (option == "Panel" || option == "2")
+    return 2;
+  if (option == "Extern" || option == "3")
+    return 3;
+  if (option == "Home Assistant" || option == "4")
+    return 4;
+  return 0;
+}
+
+void AutotermTempSourceSelect::publish_for_source(uint8_t source) {
+  this->publish_state(option_from_source_(source));
+}
+
+void AutotermTempSourceSelect::control(const std::string &value) {
+  if (parent_ == nullptr) {
+    this->publish_state(value);
+    return;
+  }
+  uint8_t src = source_from_option_(value);
+  if (src == 0) {
+    ESP_LOGW("autoterm_uart", "Temperature source select received unknown option '%s'", value.c_str());
+    parent_->publish_temp_source_select_(parent_->get_manual_temp_source());
+    return;
+  }
+  parent_->set_temp_source_from_select(src);
+}
+
 void AutotermUART::set_panel_temp_override_sensor(Sensor *s) {
   panel_temp_override_sensor_ = s;
   if (panel_temp_override_sensor_ != nullptr) {
@@ -294,14 +370,41 @@ void AutotermUART::set_panel_temp_override_sensor(Sensor *s) {
   }
 }
 
-void AutotermUART::set_panel_temp_override_switch(switch_::Switch *sw) {
-  panel_temp_override_switch_ = sw;
-  if (panel_temp_override_switch_ != nullptr) {
-    panel_temp_override_switch_state_ = panel_temp_override_switch_->state;
-    panel_temp_override_switch_->add_on_state_callback([this](bool state) {
-      this->panel_temp_override_switch_state_ = state;
-    });
+void AutotermUART::set_temp_source_select(AutotermTempSourceSelect *select) {
+  temp_source_select_ = select;
+  if (temp_source_select_ != nullptr) {
+    temp_source_select_->set_parent(this);
+    uint8_t initial = manual_temp_source_;
+    if (initial < 1 || initial > 4) {
+      if (settings_valid_ && settings_.temperature_source >= 1 && settings_.temperature_source <= 4)
+        initial = settings_.temperature_source;
+      else
+        initial = 1;
+      manual_temp_source_ = initial;
+    }
+    publish_temp_source_select_(initial);
   }
+}
+
+void AutotermUART::set_temp_source_from_select(uint8_t source) {
+  uint8_t clamped = clamp_temp_source_(source);
+  bool changed = manual_temp_source_ != clamped;
+  manual_temp_source_ = clamped;
+  settings_.temperature_source = clamped;
+  settings_valid_ = true;
+  publish_temp_source_select_(clamped);
+  if (changed) {
+    ESP_LOGI("autoterm_uart", "Temperature source set via select to %u", static_cast<unsigned>(clamped));
+    if (climate_ != nullptr)
+      climate_->handle_settings_update(settings_, true);
+  }
+}
+
+void AutotermUART::apply_temp_source_from_settings(uint8_t source) {
+  uint8_t clamped = clamp_temp_source_(source);
+  manual_temp_source_ = clamped;
+  settings_.temperature_source = clamped;
+  publish_temp_source_select_(clamped);
 }
 
 void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display) {
@@ -311,19 +414,22 @@ void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst
   bool valid = validate_crc(frame);
   std::vector<uint8_t> outgoing = frame;
 
-  if (valid && from_display && is_panel_temperature_frame_(frame) && should_override_panel_temperature_()) {
-    if (outgoing.size() > 5) {
-      uint8_t original_byte = outgoing[5];
-      uint8_t override_byte = compute_override_temperature_byte_();
-      if (override_byte != original_byte) {
-        outgoing[5] = override_byte;
-        update_crc_(outgoing);
-        ESP_LOGD("autoterm_uart", "Panel temp override active: %u -> %u (source %.1f°C)",
-                 static_cast<unsigned>(original_byte),
-                 static_cast<unsigned>(override_byte),
-                 panel_temp_override_value_c_);
+  if (valid && from_display) {
+    if (is_panel_temperature_frame_(outgoing) && should_override_panel_temperature_()) {
+      if (outgoing.size() > 5) {
+        uint8_t original_byte = outgoing[5];
+        uint8_t override_byte = compute_override_temperature_byte_();
+        if (override_byte != original_byte) {
+          outgoing[5] = override_byte;
+          update_crc_(outgoing);
+          ESP_LOGD("autoterm_uart", "Panel temp override active: %u -> %u (source %.1f°C)",
+                   static_cast<unsigned>(original_byte),
+                   static_cast<unsigned>(override_byte),
+                   panel_temp_override_value_c_);
+        }
       }
     }
+    apply_temp_source_override_(outgoing);
   }
 
   if (dst != nullptr && !outgoing.empty()) {
@@ -343,12 +449,59 @@ void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst
   parse_settings(outgoing, from_display);
 }
 
+void AutotermUART::publish_temp_source_select_(uint8_t source) {
+  if (temp_source_select_ != nullptr) {
+    uint8_t clamped = clamp_temp_source_(source);
+    temp_source_select_->publish_for_source(clamped);
+  }
+}
+
+uint8_t AutotermUART::clamp_temp_source_(uint8_t source) const {
+  if (source < 1)
+    return 1;
+  if (source > 4)
+    return 4;
+  return source;
+}
+
+bool AutotermUART::should_force_temp_source_() const {
+  return manual_temp_source_ >= 1 && manual_temp_source_ <= 4;
+}
+
+void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
+  if (!should_force_temp_source_())
+    return;
+  if (frame.size() < 7)
+    return;
+  if (frame[0] != 0xAA || frame[1] != 0x03)
+    return;
+  uint8_t command = frame[4];
+  if (command != 0x01 && command != 0x02)
+    return;
+  size_t payload_index = 5;
+  if (frame.size() <= payload_index + 2)
+    return;
+  uint8_t desired = clamp_temp_source_(manual_temp_source_);
+  uint8_t current = frame[payload_index + 2];
+  if (current == desired)
+    return;
+  frame[payload_index + 2] = desired;
+  update_crc_(frame);
+  ESP_LOGD("autoterm_uart", "Temperature source override active: %u -> %u",
+           static_cast<unsigned>(current), static_cast<unsigned>(desired));
+}
+
 bool AutotermUART::should_override_panel_temperature_() const {
   if (!std::isfinite(panel_temp_override_value_c_))
     return false;
-  if (panel_temp_override_switch_ == nullptr)
+  uint8_t source = 0;
+  if (manual_temp_source_ >= 1 && manual_temp_source_ <= 4)
+    source = manual_temp_source_;
+  else if (settings_valid_)
+    source = settings_.temperature_source;
+  if (source != 4)
     return false;
-  return panel_temp_override_switch_state_;
+  return true;
 }
 
 uint8_t AutotermUART::compute_override_temperature_byte_() const {
@@ -478,6 +631,7 @@ void AutotermUART::parse_settings(const std::vector<uint8_t> &data, bool from_di
     s.power_level = power_level;
     settings_ = s;
     settings_valid_ = true;
+    apply_temp_source_from_settings(s.temperature_source);
     if (climate_) climate_->handle_settings_update(settings_, from_display);
   }
 }
@@ -587,14 +741,14 @@ void AutotermUART::send_power_mode(bool start, uint8_t level) {
 }
 
 void AutotermUART::send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
-  uint8_t sensor = std::max<uint8_t>(1, std::min<uint8_t>(temp_sensor, 3));
+  uint8_t sensor = clamp_temp_source_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x02, 0xFF};
   send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_hold.start" : "mode.temp_hold.set");
 }
 
 void AutotermUART::send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
-  uint8_t sensor = std::max<uint8_t>(1, std::min<uint8_t>(temp_sensor, 3));
+  uint8_t sensor = clamp_temp_source_(temp_sensor);
   uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
   std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x01, 0xFF};
   send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_to_fan.start" : "mode.temp_to_fan.set");
@@ -667,7 +821,11 @@ void AutotermClimate::set_default_temperature(float temperature_c) {
 }
 
 void AutotermClimate::set_default_temp_sensor(uint8_t sensor) {
-  default_temp_sensor_ = std::max<uint8_t>(1, std::min<uint8_t>(sensor, 3));
+  if (sensor < 1)
+    sensor = 1;
+  if (sensor > 4)
+    sensor = 4;
+  default_temp_sensor_ = sensor;
 }
 
 climate::ClimateTraits AutotermClimate::traits() {
@@ -856,12 +1014,22 @@ std::string AutotermClimate::sanitize_preset_(const std::string &preset) const {
 }
 
 uint8_t AutotermClimate::resolve_temp_sensor_() const {
-  if (parent_ != nullptr && parent_->settings_valid_) {
-    uint8_t src = parent_->settings_.temperature_source;
-    if (src >= 1 && src <= 3)
-      return src;
+  if (parent_ != nullptr) {
+    uint8_t manual = parent_->get_manual_temp_source();
+    if (manual >= 1 && manual <= 4)
+      return manual;
+    if (parent_->settings_valid_) {
+      uint8_t src = parent_->settings_.temperature_source;
+      if (src >= 1 && src <= 4)
+        return src;
+    }
   }
-  return std::max<uint8_t>(1, std::min<uint8_t>(default_temp_sensor_, static_cast<uint8_t>(3)));
+  uint8_t sensor = default_temp_sensor_;
+  if (sensor < 1)
+    sensor = 1;
+  if (sensor > 4)
+    sensor = 4;
+  return sensor;
 }
 
 climate::ClimateMode AutotermClimate::deduce_mode_from_settings_(const AutotermUART::Settings &settings) const {

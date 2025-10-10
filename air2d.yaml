@@ -58,14 +58,6 @@ sensor:
 
 text_sensor:
 
-switch:
-  - platform: template
-    name: "Display Temp Override"
-    id: panel_temp_override_switch
-    icon: "mdi:thermometer"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-
 autoterm_uart:
   uart_display_id: uart_panel
   uart_heater_id: uart_heater
@@ -98,4 +90,5 @@ autoterm_uart:
     default_temp_sensor: 2
   panel_temp_override:
     sensor: living_area_temperature
-    enable_switch: panel_temp_override_switch
+  temperature_source_select:
+    name: "Temperature Source"

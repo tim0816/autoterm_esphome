@@ -6,15 +6,16 @@ import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
 import esphome.components.climate as climate
-import esphome.components.switch as switch
+import esphome.components.select as select
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "climate", "switch"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "climate", "select"]
 AUTO_LOAD = ["climate"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
 AutotermClimate = autoterm_ns.class_("AutotermClimate", climate.Climate)
+AutotermTempSourceSelect = autoterm_ns.class_("AutotermTempSourceSelect", select.Select)
 
 CONF_CLIMATE = "climate"
 CONF_DEFAULT_LEVEL = "default_level"
@@ -22,12 +23,14 @@ CONF_DEFAULT_TEMPERATURE = "default_temperature"
 CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
 CONF_PANEL_TEMP_OVERRIDE = "panel_temp_override"
 CONF_PANEL_TEMP_OVERRIDE_SENSOR = "sensor"
-CONF_PANEL_TEMP_OVERRIDE_SWITCH = "enable_switch"
+CONF_TEMP_SOURCE_SELECT = "temperature_source_select"
+
+TEMP_SOURCE_OPTIONS = ["Intern", "Panel", "Extern", "Home Assistant"]
 
 CLIMATE_SCHEMA = climate.climate_schema(AutotermClimate).extend({
     cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
     cv.Optional(CONF_DEFAULT_TEMPERATURE, default=20.0): cv.temperature,
-    cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=2): cv.int_range(min=1, max=3),
+    cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=2): cv.int_range(min=1, max=4),
 })
 
 CONFIG_SCHEMA = cv.Schema({
@@ -52,8 +55,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CLIMATE): CLIMATE_SCHEMA,
     cv.Optional(CONF_PANEL_TEMP_OVERRIDE): cv.Schema({
         cv.Required(CONF_PANEL_TEMP_OVERRIDE_SENSOR): cv.use_id(sensor.Sensor),
-        cv.Required(CONF_PANEL_TEMP_OVERRIDE_SWITCH): cv.use_id(switch.Switch),
     }),
+    cv.Optional(CONF_TEMP_SOURCE_SELECT): select.select_schema(class_=AutotermTempSourceSelect, icon="mdi:thermometer-probe"),
 
 })
 
@@ -110,6 +113,9 @@ async def to_code(config):
     if CONF_PANEL_TEMP_OVERRIDE in config:
         override_conf = config[CONF_PANEL_TEMP_OVERRIDE]
         src = await cg.get_variable(override_conf[CONF_PANEL_TEMP_OVERRIDE_SENSOR])
-        sw = await cg.get_variable(override_conf[CONF_PANEL_TEMP_OVERRIDE_SWITCH])
         cg.add(var.set_panel_temp_override_sensor(src))
-        cg.add(var.set_panel_temp_override_switch(sw))
+
+    if CONF_TEMP_SOURCE_SELECT in config:
+        select_conf = config[CONF_TEMP_SOURCE_SELECT]
+        sel = await select.new_select(select_conf, options=TEMP_SOURCE_OPTIONS)
+        cg.add(var.set_temp_source_select(sel))

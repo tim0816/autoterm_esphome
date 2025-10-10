@@ -633,6 +633,9 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
     case 0x0304:
       status_txt = "cooling down";
       break;
+    case 0x0305:
+      status_txt = "idle ventilation";
+      break;
     case 0x0400:
       status_txt = "shutting down";
       break;

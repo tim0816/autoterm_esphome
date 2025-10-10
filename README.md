@@ -60,12 +60,12 @@ CRC-Berechnung siehe Quellen.
 | Code (`data[4]`) | Richtung | Bedeutung / Zweck | Antwortgröße | Beschreibung |
 |------------------|-----------|------------------|---------------|---------------|
 | `0x0F` | Heizung → Display | **Statusmeldung** | 0x13 Bytes | enthält Temperaturen, Spannung, Lüfter- und Pumpenwerte sowie Statuscode |
-| `0x02` | Heizung → Display | **Einstellungen (Settings)** | 6 Bytes | liefert aktuelle Parameter wie Temp-Quelle, Solltemp, Leistung usw. |
-| `0x03` | Display → Heizung | **Power-Off-Kommando** | – | beendet Heizvorgang |
-| `0x01` | Display → Heizung | **Power-ON mit Settings** | 6 Bytes | schaltet ein und überträgt aktuelle Settings |
-| `0x11` | Display ↔ Heizung | **Panel-Temperatur (Messwert)** | 1 Byte | realer oder virtueller Panel-Sensorwert (0–255 °C) |
-| `0x23` | Display → Heizung | **Fan-Mode-Start** | 4 Bytes | aktiviert „Nur Lüften“ mit bestimmter Drehzahl |
-| `0x02` | Display → Heizung | **Settings-Schreiben** | 6 Bytes | neue Soll-Werte an Heizung übertragen |
+| `0x02` | Heizung → Display | **Einstellungen (Settings)** | 6 Bytes | liefert aktuelle Parameter wie Temp-Quelle, Solltemp, Leistungsstufe usw. |
+| `0x01` | Display → Heizung | **Power-Mode Start/Set** | 6 Bytes | Startet die Heizung bzw. setzt Leistungsstufe (`FF FF 04 FF 02 <level>`) |
+| `0x02` | Display → Heizung | **Preset-/Temperatur-Update** | 6 Bytes | Überträgt Zieltemperatur & Sensorwahl (`FF FF <sensor> <temp> <preset> FF`) |
+| `0x03` | Display → Heizung | **Standby / Power-Off** | – | beendet Heizvorgang (kein Payload) |
+| `0x11` | Display ↔ Heizung | **Panel-Temperatur (Messwert)** | 1 Byte | realer oder virtueller Panel-Sensorwert (0–99 °C genutzt) |
+| `0x23` | Display → Heizung | **Fan-Only-Modus** | 4 Bytes | aktiviert „Nur Lüften“ (`FF FF <level> FF`) |
 
 ---
 
@@ -116,7 +116,7 @@ CRC-Berechnung siehe Quellen.
 | `0x0300` | heating |
 | `0x0323` | only fan |
 | `0x0304` | cooling down |
-| `0x0305` | idle venting |
+| `0x0305` | idle ventilation |
 | `0x0400` | shutting down |
 | *andere* | unknown (HEX-Code wird mit angezeigt) |
 
@@ -150,7 +150,7 @@ AA 04 06 00 02 00 78 02 0F 00 05 39 3D
 
 ### 🔸 Beispiel: Panel-Temperatur-Frame (`0x11`)
 
-**Richtung:** Display → Heizung
+**Richtung:** Display ↔ Heizung
 
 ```
 AA 03 01 00 11 [temp_raw] CRC_H CRC_L
@@ -159,25 +159,26 @@ AA 03 01 00 11 [temp_raw] CRC_H CRC_L
 - `temp_raw` = 0–255 → 0–255 °C  
 - Wird alle 2 s übertragen (oder vom ESP simuliert, wenn „Virtual Panel Override“ aktiv ist)
 
-**Beispiel:**
+**Beispiel (Display → Heizung):**
 
 ```
-AA 04 01 00 11 10 B1 E5
+AA 03 01 00 11 10 9B 66
 ```
 
 → Temperatur 16 °C
 
 ---
 
-### 🔸 Power ON / OFF
+### 🔸 Power- und Standby-Kommandos
 
-**Power ON**
+**Power / Leistungsstufe (`0x01` bzw. `0x02`)**
 
 ```
-AA 03 06 00 01 [use_work_time] [work_time] [temp_src] [set_temp] [wait_mode] [power_lvl] CRC_H CRC_L
+AA 03 06 00 01 FF FF 04 FF 02 [level] CRC_H CRC_L   # Start mit Stufe <level>
+AA 03 06 00 02 FF FF 04 FF 02 [level] CRC_H CRC_L   # Stufe nach dem Start anpassen
 ```
 
-**Power OFF**
+**Standby (`0x03`)**
 
 ```
 AA 03 00 00 03 CRC_H CRC_L
@@ -219,37 +220,32 @@ Wenn der ESP kein Bedienteil erkennt, sendet er regelmäßig eigene Requests:
 |------|-----------|----------------|-------|
 | `0x0F` | Heater → Display | 19 B | Statusdaten |
 | `0x02` | Heater → Display | 6 B | Settings lesen |
-| `0x02` | Display → Heater | 6 B | Settings schreiben |
-| `0x01` | Display → Heater | 6 B | Power ON |
-| `0x03` | Display → Heater | 0 B | Power OFF |
-| `0x11` | Display → Heater | 1 B | Panel-Temperatur |
-| `0x23` | Display → Heater | 4 B | Fan Mode starten |
+| `0x02` | Display → Heater | 6 B | Temperatur-/Preset-Update |
+| `0x01` | Display → Heater | 6 B | Power-Mode Start/Stufe |
+| `0x03` | Display → Heater | 0 B | Standby (Power OFF) |
+| `0x11` | Display ↔ Heater | 1 B | Panel-Temperatur |
+| `0x23` | Display → Heater | 4 B | Fan-Only-Modus |
 
 ---
 
 ## 🧩 Entitäten in Home Assistant
 
-| Typ | Name | Beschreibung |
-|------|------|--------------|
-| Sensor | Interne Temperatur | Temperatursensor im Gerät |
-| Sensor | Externe Temperatur | Außentemperaturfühler |
-| Sensor | Heizkörpertemperatur | Temperatur im Wärmetauscher |
-| Sensor | Panel Temperatur | Rohwert vom Panel (oder virtuell) |
-| Sensor | Spannung | Bordnetzspannung |
-| Sensor | Lüfter Soll (rpm) | RPM × 60 |
-| Sensor | Lüfter Ist (rpm) | RPM × 60 |
-| Sensor | Pumpenfrequenz | Hz |
-| Sensor | Statuswert (numerisch) | zusammengesetzt aus High/Low |
-| Text Sensor | Heizstatus (Text) | „heating“, „standby“ etc. inkl. HEX bei unknown |
-| Text Sensor | Temperaturquelle | „internal“, „panel“, „external“, „no automatic…“ |
-| Button | Heizung Ein/Aus | Startet oder stoppt den Heizprozess |
-| Number | Zieltemperatur | Solltemperatur |
-| Number | Lüfterstufe | 0–9 (manuell) |
-| Number | Arbeitszeit | 0–255 min |
-| Number | Leistungsstufe | 0–9 |
-| Switch | Warte-Modus | 1 = on, 2 = off |
-| Switch | Virtuelles Panel Override | ESP32 simuliert Panel |
-| Select | Temperaturquelle wählen | setzt 1/2/3/4 |
+| Typ | Name (Standard) | Beschreibung |
+|------|----------------|--------------|
+| Climate | Autoterm Climate | Vollständiges Climate-Entity mit Modi, Presets und Zieltemperatur |
+| Sensor | Internal Temperature | Temperatur im Heizgerät (°C) |
+| Sensor | External Temperature | Externer Temperaturfühler (°C) |
+| Sensor | Heater Temperature | Temperatur am Wärmetauscher (°C) |
+| Sensor | Panel Temperature | Panel-/Display-Temperatur (°C, real oder virtuell) |
+| Sensor | Voltage | Versorgungsspannung der Heizung (V) |
+| Sensor | Fan RPM Set | Angeforderte Lüfterdrehzahl (rpm) |
+| Sensor | Fan RPM Actual | Gemessene Lüfterdrehzahl (rpm) |
+| Sensor | Pump Frequency | Takt der Dosierpumpe (Hz) |
+| Text Sensor | Status Text | Klartextstatus, inklusive HEX-Fallback bei unbekannten Codes |
+| Number | Fan Level | Direkte Vorgabe der Lüfterstufe (0–9) |
+| Select | Temperature Source | Auswahl der Temperaturquelle (Intern/Panel/Extern/Home Assistant) |
+
+Für ein Panel-Temperatur-Override kann zusätzlich ein bestehender Sensor (z. B. aus Home Assistant) eingebunden und unter `panel_temp_override.sensor` referenziert werden. Dieser wird genutzt, wenn die Temperaturquelle „Home Assistant“ gewählt ist.
 
 ---
 

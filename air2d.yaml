@@ -49,18 +49,23 @@ uart:
     tx_pin: 23
     baud_rate: 9600
     rx_buffer_size: 1024
-sensor:
-  # Beispiel: Temperatur aus Home Assistant als virtuelles Paneel-Feedback
-  - platform: homeassistant
-    entity_id: sensor.living_area_temperature
-    id: living_area_temperature
-    internal: true
 
-text_sensor:
+
+sensor:
+  # Beispiel: Temperatur aus Home Assistant
+  - platform: homeassistant
+    entity_id: sensor.innenraum_temperature
+    id: innenraum_temperature
+    internal: true
 
 autoterm_uart:
   uart_display_id: uart_panel
   uart_heater_id: uart_heater
+  climate:
+    name: "Heizung"
+    default_level: 4
+    default_temperature: 20 °C
+    default_temp_sensor: 2
   internal_temp:
     name: "Internal Temperature"
   external_temp:
@@ -83,12 +88,9 @@ autoterm_uart:
   pump_frequency:
     name: "Pump Frequency"
     unit_of_measurement: "Hz"
-  climate:
-    name: "Autoterm Climate"
-    default_level: 4
-    default_temperature: 20 °C
-    default_temp_sensor: 2
+  fan_level:
+    name: "Fan Level"
   panel_temp_override:
-    sensor: living_area_temperature
+    sensor: innenraum_temperature
   temperature_source_select:
     name: "Temperature Source"

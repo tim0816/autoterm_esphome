@@ -578,8 +578,8 @@ climate::ClimateTraits AutotermClimate::traits() {
   presets.insert("thermostat");
   traits.set_supported_custom_presets(std::move(presets));
   std::set<std::string> fan_modes;
-  for (int i = 1; i <= 10; i++)
-    fan_modes.insert(std::to_string(i));
+  for (int i = 0; i <= 9; i++)
+    fan_modes.insert("Power " + std::to_string(i));
   traits.set_supported_custom_fan_modes(std::move(fan_modes));
   traits.set_visual_min_temperature(0.0f);
   traits.set_visual_max_temperature(30.0f);
@@ -699,21 +699,23 @@ float AutotermClimate::clamp_temperature_(float temperature) {
 
 std::string AutotermClimate::fan_mode_label_from_level_(uint8_t level) const {
   level = clamp_level_(level);
-  return std::to_string(static_cast<int>(level) + 1);
+  return "Power " + std::to_string(static_cast<int>(level));
 }
 
 uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) const {
-  if (label.empty())
+  const std::string prefix = "Power ";
+  if (label.size() <= prefix.size() || label.compare(0, prefix.size(), prefix) != 0)
+    return fan_level_;
+  std::string digits = label.substr(prefix.size());
+  if (digits.empty())
     return fan_level_;
   int value = 0;
-  for (char c : label) {
+  for (char c : digits) {
     if (!std::isdigit(static_cast<unsigned char>(c)))
       return fan_level_;
     value = value * 10 + (c - '0');
   }
-  if (value <= 0)
-    return fan_level_;
-  return clamp_level_(value - 1);
+  return clamp_level_(value);
 }
 
 std::string AutotermClimate::sanitize_preset_(const std::string &preset) const {

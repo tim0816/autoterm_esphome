@@ -309,7 +309,7 @@ void AutotermFanLevelNumber::control(float value) {
 
 void AutotermTempSourceSelect::set_parent(AutotermUART *parent) {
   parent_ = parent;
-  this->traits().set_options({"Intern", "Panel", "Extern", "Home Assistant"});
+  this->traits.set_options({"Intern", "Panel", "Extern", "Home Assistant"});
 }
 
 const char *AutotermTempSourceSelect::option_from_source_(uint8_t source) const {

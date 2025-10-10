@@ -69,7 +69,6 @@ Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfig
 | Sensor | Fan RPM Actual | Gemessene Lüfterdrehzahl (rpm) |
 | Sensor | Pump Frequency | Takt der Dosierpumpe (Hz) |
 | Text Sensor | Status Text | Klartextstatus, inklusive HEX-Fallback bei unbekannten Codes |
-| Number | Fan Level | Direkte Vorgabe der Lüfterstufe (0–9) |
 | Select | Temperature Source | Auswahl der Temperaturquelle (Intern/Panel/Extern/Home Assistant) |
 
 Für ein Panel-Temperatur-Override kann zusätzlich ein bestehender Sensor (z. B. aus Home Assistant) eingebunden und unter `panel_temp_override.sensor` referenziert werden. Dieser wird genutzt, wenn die Temperaturquelle „Home Assistant“ gewählt ist.

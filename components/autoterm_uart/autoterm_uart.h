@@ -579,7 +579,7 @@ climate::ClimateTraits AutotermClimate::traits() {
   traits.set_supported_custom_presets(std::move(presets));
   std::set<std::string> fan_modes;
   for (int i = 0; i <= 9; i++)
-    fan_modes.insert("Power " + std::to_string(i));
+    fan_modes.insert("Stufe " + std::to_string(i));
   traits.set_supported_custom_fan_modes(std::move(fan_modes));
   traits.set_visual_min_temperature(0.0f);
   traits.set_visual_max_temperature(30.0f);
@@ -699,11 +699,11 @@ float AutotermClimate::clamp_temperature_(float temperature) {
 
 std::string AutotermClimate::fan_mode_label_from_level_(uint8_t level) const {
   level = clamp_level_(level);
-  return "Power " + std::to_string(static_cast<int>(level));
+  return "Stufe " + std::to_string(static_cast<int>(level));
 }
 
 uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) const {
-  const std::string prefix = "Power ";
+  const std::string prefix = "Stufe ";
   if (label.size() <= prefix.size() || label.compare(0, prefix.size(), prefix) != 0)
     return fan_level_;
   std::string digits = label.substr(prefix.size());
@@ -809,12 +809,7 @@ void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string 
 
   this->mode = mode;
   this->preset.reset();
-  if (mode != climate::CLIMATE_MODE_FAN_ONLY && !preset_mode_.empty())
-    this->custom_preset = preset_mode_;
-  else
-    this->custom_preset.reset();
-  
-  if (!preset_mode_.empty())
+  if (mode != climate::CLIMATE_MODE_FAN_ONLY && mode != climate::CLIMATE_MODE_OFF && !preset_mode_.empty())
     this->custom_preset = preset_mode_;
   else
     this->custom_preset.reset();

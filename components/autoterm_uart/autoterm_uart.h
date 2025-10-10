@@ -594,10 +594,34 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
     new_mode = *call.get_mode();
 
   std::string new_preset = preset_mode_;
-  if (call.get_custom_preset().has_value())
+  bool preset_overridden = false;
+  if (call.get_custom_preset().has_value()) {
     new_preset = sanitize_preset_(*call.get_custom_preset());
-  else if (call.get_preset().has_value())
+    preset_overridden = true;
+  } else if (call.get_preset().has_value()) {
     new_preset = sanitize_preset_(preset_from_enum_(*call.get_preset()));
+    preset_overridden = true;
+  }
+
+  if (!preset_overridden) {
+    switch (new_mode) {
+      case climate::CLIMATE_MODE_HEAT:
+        new_preset = "temp_hold";
+        break;
+      case climate::CLIMATE_MODE_AUTO:
+        new_preset = "temp_to_fan";
+        break;
+      case climate::CLIMATE_MODE_FAN_ONLY:
+      case climate::CLIMATE_MODE_OFF:
+        new_preset.clear();
+        break;
+      default:
+        new_preset = "power";
+        break;
+    }
+    if (!new_preset.empty())
+      new_preset = sanitize_preset_(new_preset);
+  }
 
   uint8_t new_level = fan_level_;
   if (call.get_custom_fan_mode().has_value())

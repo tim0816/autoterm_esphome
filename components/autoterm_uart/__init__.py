@@ -6,8 +6,9 @@ import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
 import esphome.components.climate as climate
+import esphome.components.switch as switch
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "climate"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "climate", "switch"]
 AUTO_LOAD = ["climate"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
@@ -19,6 +20,9 @@ CONF_CLIMATE = "climate"
 CONF_DEFAULT_LEVEL = "default_level"
 CONF_DEFAULT_TEMPERATURE = "default_temperature"
 CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
+CONF_PANEL_TEMP_OVERRIDE = "panel_temp_override"
+CONF_PANEL_TEMP_OVERRIDE_SENSOR = "sensor"
+CONF_PANEL_TEMP_OVERRIDE_SWITCH = "enable_switch"
 
 CLIMATE_SCHEMA = climate.climate_schema(AutotermClimate).extend({
     cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
@@ -46,6 +50,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
 
     cv.Optional(CONF_CLIMATE): CLIMATE_SCHEMA,
+    cv.Optional(CONF_PANEL_TEMP_OVERRIDE): cv.Schema({
+        cv.Required(CONF_PANEL_TEMP_OVERRIDE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_PANEL_TEMP_OVERRIDE_SWITCH): cv.use_id(switch.Switch),
+    }),
 
 })
 
@@ -98,3 +106,10 @@ async def to_code(config):
         cg.add(clim.set_default_temperature(climate_conf[CONF_DEFAULT_TEMPERATURE]))
         cg.add(clim.set_default_temp_sensor(climate_conf[CONF_DEFAULT_TEMP_SENSOR]))
         cg.add(var.set_climate(clim))
+
+    if CONF_PANEL_TEMP_OVERRIDE in config:
+        override_conf = config[CONF_PANEL_TEMP_OVERRIDE]
+        src = await cg.get_variable(override_conf[CONF_PANEL_TEMP_OVERRIDE_SENSOR])
+        sw = await cg.get_variable(override_conf[CONF_PANEL_TEMP_OVERRIDE_SWITCH])
+        cg.add(var.set_panel_temp_override_sensor(src))
+        cg.add(var.set_panel_temp_override_switch(sw))

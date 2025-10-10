@@ -5,6 +5,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/climate/climate.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/core/time.h"
 #include <algorithm>
 #include <cctype>
@@ -53,6 +54,10 @@ class AutotermUART : public Component {
   Sensor *fan_speed_actual_sensor_{nullptr};
   Sensor *pump_frequency_sensor_{nullptr};
   text_sensor::TextSensor *status_text_sensor_{nullptr};
+  Sensor *panel_temp_override_sensor_{nullptr};
+  switch_::Switch *panel_temp_override_switch_{nullptr};
+  float panel_temp_override_value_c_{NAN};
+  bool panel_temp_override_switch_state_{false};
 
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
@@ -95,6 +100,8 @@ class AutotermUART : public Component {
   }
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
 
+  void set_panel_temp_override_sensor(Sensor *s);
+  void set_panel_temp_override_switch(switch_::Switch *sw);
 
   // Neue Setter mit Rückreferenz
   void set_fan_level_number(AutotermFanLevelNumber *n) {
@@ -154,30 +161,40 @@ class AutotermUART : public Component {
       uint8_t b;
       if (!src->read_byte(&b)) break;
 
-      dst->write_byte(b);
       buffer.push_back(b);
 
       if (from_display)
         last_display_activity_ = millis();
 
-      if (buffer.size() >= 3 && buffer[0] == 0xAA) {
-        uint8_t len = buffer[2];
-        int total = 5 + len + 2;  // Header + Payload + CRC
-        if (buffer.size() >= total) {
-          if (validate_crc(buffer)) {
-            if (is_panel_temperature_frame_(buffer))
-              handle_panel_temperature_frame_(buffer);
-            log_frame(tag, buffer);
-            parse_status(buffer);
-            parse_settings(buffer, from_display);
-          } else {
-            ESP_LOGW("autoterm_uart", "[%s] CRC falsch, verworfen", tag);
-          }
-          buffer.clear();
-        }
+      // Schraube lose Bytes vor dem Header direkt durch
+      while (!buffer.empty() && buffer[0] != 0xAA) {
+        dst->write_byte(buffer[0]);
+        buffer.erase(buffer.begin());
       }
-      if (buffer.size() > 64 && buffer[0] != 0xAA)
+
+      while (true) {
+        if (buffer.empty())
+          break;
+        if (buffer[0] != 0xAA)
+          break;
+        if (buffer.size() < 3)
+          break;
+
+        uint8_t len = buffer[2];
+        size_t total = 5 + static_cast<size_t>(len) + 2;
+        if (buffer.size() < total)
+          break;
+
+        std::vector<uint8_t> frame(buffer.begin(), buffer.begin() + total);
+        process_frame_(std::move(frame), dst, tag, from_display);
+        buffer.erase(buffer.begin(), buffer.begin() + total);
+      }
+
+      if (buffer.size() > 64) {
+        for (uint8_t byte : buffer)
+          dst->write_byte(byte);
         buffer.clear();
+      }
     }
   }
 
@@ -209,6 +226,10 @@ public:
   void send_status_request();
   bool is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const;
   void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
+  void process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display);
+  bool should_override_panel_temperature_() const;
+  uint8_t compute_override_temperature_byte_() const;
+  void update_crc_(std::vector<uint8_t> &frame);
   bool send_command_(uint8_t command, const std::vector<uint8_t> &payload, const char *log_label);
   uint16_t append_crc_(std::vector<uint8_t> &frame);
   static uint16_t crc16_modbus_(const uint8_t *data, size_t length);
@@ -261,6 +282,93 @@ class AutotermClimate : public climate::Climate {
 void AutotermFanLevelNumber::control(float value) {
   publish_state(value);
   if (parent_) parent_->send_fan_mode(true, (int)value);
+}
+
+void AutotermUART::set_panel_temp_override_sensor(Sensor *s) {
+  panel_temp_override_sensor_ = s;
+  if (panel_temp_override_sensor_ != nullptr) {
+    panel_temp_override_sensor_->add_on_state_callback([this](float value) {
+      this->panel_temp_override_value_c_ = value;
+    });
+    if (panel_temp_override_sensor_->has_state())
+      panel_temp_override_value_c_ = panel_temp_override_sensor_->state;
+  }
+}
+
+void AutotermUART::set_panel_temp_override_switch(switch_::Switch *sw) {
+  panel_temp_override_switch_ = sw;
+  if (panel_temp_override_switch_ != nullptr) {
+    panel_temp_override_switch_state_ = panel_temp_override_switch_->state;
+    panel_temp_override_switch_->add_on_state_callback([this](bool state) {
+      this->panel_temp_override_switch_state_ = state;
+    });
+  }
+}
+
+void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display) {
+  if (frame.empty())
+    return;
+
+  bool valid = validate_crc(frame);
+  std::vector<uint8_t> outgoing = frame;
+
+  if (valid && from_display && is_panel_temperature_frame_(frame) && should_override_panel_temperature_()) {
+    if (outgoing.size() > 5) {
+      uint8_t original_byte = outgoing[5];
+      uint8_t override_byte = compute_override_temperature_byte_();
+      if (override_byte != original_byte) {
+        outgoing[5] = override_byte;
+        update_crc_(outgoing);
+        ESP_LOGD("autoterm_uart", "Panel temp override active: %u -> %u (source %.1f°C)",
+                 static_cast<unsigned>(original_byte),
+                 static_cast<unsigned>(override_byte),
+                 panel_temp_override_value_c_);
+      }
+    }
+  }
+
+  if (dst != nullptr && !outgoing.empty()) {
+    dst->write_array(outgoing.data(), outgoing.size());
+    dst->flush();
+  }
+
+  if (!valid) {
+    ESP_LOGW("autoterm_uart", "[%s] CRC falsch, weitergeleitet", tag);
+    return;
+  }
+
+  if (is_panel_temperature_frame_(outgoing))
+    handle_panel_temperature_frame_(outgoing);
+  log_frame(tag, outgoing);
+  parse_status(outgoing);
+  parse_settings(outgoing, from_display);
+}
+
+bool AutotermUART::should_override_panel_temperature_() const {
+  if (!std::isfinite(panel_temp_override_value_c_))
+    return false;
+  if (panel_temp_override_switch_ == nullptr)
+    return false;
+  return panel_temp_override_switch_state_;
+}
+
+uint8_t AutotermUART::compute_override_temperature_byte_() const {
+  float value = panel_temp_override_value_c_;
+  if (!std::isfinite(value))
+    value = 0.0f;
+  if (value < 0.0f)
+    value = 0.0f;
+  if (value > 99.0f)
+    value = 99.0f;
+  return static_cast<uint8_t>(std::round(value));
+}
+
+void AutotermUART::update_crc_(std::vector<uint8_t> &frame) {
+  if (frame.size() < 3)
+    return;
+  uint16_t crc = crc16_modbus_(frame.data(), frame.size() - 2);
+  frame[frame.size() - 2] = (crc >> 8) & 0xFF;
+  frame[frame.size() - 1] = crc & 0xFF;
 }
 
 // ===================

@@ -15,17 +15,14 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 
 ## 📦 Funktionsübersicht
 
-- 🧭 **Bidirektionale UART-Bridge** zwischen Display und Heizung  
-- 📊 **Status- und Sensordaten**: Innen-, Außen-, Heiz- und Paneltemperatur, Spannung, Pumpenfrequenz, Lüfterdrehzahl  
-- 🔘 **Steuerfunktionen**:
-  - Ein-/Ausschalten der Heizung  
-  - Nur Lüften (Fan Mode)  
-  - Einstellen von Zieltemperatur, Leistungsstufe und Arbeitszeit  
-  - Umschalten der Temperaturquelle  
-  - Aktivieren eines „virtuellen Panel“-Modus (Override)  
-- 🧩 **Kompatibel mit Home Assistant** (über ESPHome Integration)  
-- 🧾 **Debug-Modus**: zeigt empfangene und gesendete UART-Frames in HEX-Darstellung  
-- ⚙️ Unterstützt automatische Wiederverbindung und Statusabfrage, wenn kein Display erkannt wird  
+- 🧭 **Bidirektionale UART-Bridge** zwischen Display und Heizung inkl. Durchleitung aller Frames  
+- 📊 **Sensor-Outputs**: interne/externe/Heiz- und Paneltemperatur, Bordspannung, Statuscode/Text, Lüfterdrehzahlen (Soll/Ist) sowie Pumpenfrequenz  
+- 🌡️ **Climate-Entity mit Presets**: steuert Heizen, Automatik, Lüften und Leistungsstufen über ESPHome/Home Assistant  
+- 🎚️ **Direkte Stellgrößen**: separates Number-Entity für Lüfterstufe und Select-Entity zur Wahl der Temperaturquelle (inkl. „Home Assistant“-Feed)  
+- 🛰️ **Virtuelles Panel**: optionaler Override injiziert eine externe Temperatur in den Panel-Datenstrom  
+- 🧩 **Nahtlose Home-Assistant-Integration** durch native ESPHome-Komponenten  
+- 🧾 **Ausführliches Logging** der übertragenen Frames (HEX) im Debug-Level  
+- ⚙️ **Fallback-Logik**: automatische Status-/Settings-Abfragen, wenn kein Bedienteil erkannt wird  
 
 ---
 

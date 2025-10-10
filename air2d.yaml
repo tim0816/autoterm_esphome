@@ -8,7 +8,7 @@ esp32:
     type: arduino
 
 external_components:
-  - source: github://tim0816/autoterm_esphome
+  - source: github://tim0816/autoterm_esphome@V1-test
     components: [autoterm_uart]
     refresh: 0s
 
@@ -38,7 +38,7 @@ web_server:
 captive_portal:
   
 uart:
-  - id: uart_display          # Verbindung zum Bedienteil
+  - id: uart_panel          # Verbindung zum Bedienteil
     rx_pin: 16
     tx_pin: 17
     baud_rate: 9600
@@ -61,7 +61,7 @@ text_sensor:
 switch:
 
 autoterm_uart:
-  uart_display_id: uart_display
+  uart_display_id: uart_panel
   uart_heater_id: uart_heater
   internal_temp:
     name: "Internal Temperature"
@@ -74,57 +74,14 @@ autoterm_uart:
   voltage:
     name: "Voltage"
     accuracy_decimals: 1
-  status:
-    name: "Status"
   status_text:
     name: "Status Text"
   fan_speed_set:
     name: "Fan RPM Set"
     unit_of_measurement: "rpm"
-
   fan_speed_actual:
     name: "Fan RPM Actual"
     unit_of_measurement: "rpm"
-
   pump_frequency:
     name: "Pump Frequency"
     unit_of_measurement: "Hz"
-
-  set_temperature_control:
-    name: "Solltemperatur"
-  work_time_control:
-    name: "Arbeitszeit"
-  power_level_control:
-    name: "Leistungsstufe"
-  virtual_panel_temperature_control:
-    name: "Virtuelle Paneeltemperatur"
-    min_value: 0
-    max_value: 40
-    step: 1
-  virtual_panel_override_switch:
-    name: "Virtuelle Paneeltemperatur verwenden"
-  temperature_source_control:
-    name: "Temperaturquelle"
-  use_work_time_switch:
-    name: "Arbeitszeit verwenden"
-  wait_mode_switch:
-    name: "Wartebetrieb"
-  display_connected:
-    name: "Display Connected"
-  virtual_panel_temperature: living_area_temperature
-
-  # --- Settings-Auswertung ---
-  temperature_source:
-    name: "Temperature Source"
-  set_temperature:
-    name: "Set Temperature"
-    unit_of_measurement: "°C"
-  work_time:
-    name: "Work Time"
-    unit_of_measurement: "min"
-  power_level:
-    name: "Power Level"
-  wait_mode:
-    name: "Wait Mode"
-  use_work_time:
-    name: "Use Work Time"

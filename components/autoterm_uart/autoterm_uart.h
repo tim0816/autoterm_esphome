@@ -4,7 +4,6 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
-#include "esphome/components/button/button.h"
 #include "esphome/core/time.h"
 #include <vector>
 #include <string>
@@ -17,40 +16,6 @@ using namespace esphome::uart;
 using namespace esphome::sensor;
 
 class AutotermUART;  // Vorwärtsdeklaration
-
-// ===================
-// Custom Button Class
-// ===================
-class AutotermPowerOnButton : public button::Button {
- public:
-  AutotermUART *parent_{nullptr};
-  void setup_parent(AutotermUART *p) { parent_ = p; }
-
- protected:
-  void press_action() override;
-};
-
-class AutotermPowerOffButton : public button::Button {
-  public:
-   AutotermUART *parent_{nullptr};
-   void setup_parent(AutotermUART *p) { parent_ = p; }
-
-  protected:
-   void press_action() override;  // implementieren wir unten
- };
-
-
-// ===================
-// Custom Button Class (Lüften)
-// ===================
-class AutotermFanModeButton : public button::Button {
- public:
-  AutotermUART *parent_{nullptr};
-  void setup_parent(AutotermUART *p) { parent_ = p; }
-
- protected:
-  void press_action() override;
-};
 
 // ===================
 // Custom Number Class
@@ -85,10 +50,6 @@ class AutotermUART : public Component {
   text_sensor::TextSensor *status_text_sensor_{nullptr};
 
 
-  // Steuerobjekte
-  AutotermPowerOnButton *power_on_button_{nullptr};
-  AutotermPowerOffButton *power_off_button_{nullptr};
-  AutotermFanModeButton *fan_mode_button_{nullptr};
   AutotermFanLevelNumber *fan_level_number_{nullptr};
 
   struct Settings {
@@ -108,8 +69,6 @@ class AutotermUART : public Component {
   std::vector<uint8_t> display_to_heater_buffer_;
   std::vector<uint8_t> heater_to_display_buffer_;
 
-  void send_power_on();
-  void send_power_off();
   void set_uart_display(UARTComponent *u) { uart_display_ = u; }
   void set_uart_heater(UARTComponent *u) { uart_heater_ = u; }
 
@@ -132,18 +91,6 @@ class AutotermUART : public Component {
 
 
   // Neue Setter mit Rückreferenz
-  void set_power_on_button(AutotermPowerOnButton *b) {
-    power_on_button_ = b;
-    if (b) b->setup_parent(this);
-  }
-  void set_power_off_button(AutotermPowerOffButton *b) {
-    power_off_button_ = b;
-    if (b) b->setup_parent(this);
-  }
-  void set_fan_mode_button(AutotermFanModeButton *b) {
-    fan_mode_button_ = b;
-    if (b) b->setup_parent(this);
-  }
   void set_fan_level_number(AutotermFanLevelNumber *n) {
     fan_level_number_ = n;
     if (n) n->setup_parent(this);
@@ -260,20 +207,6 @@ public:
 // ===================
 // Methodenimplementierungen
 // ===================
-
-// Button gedrückt → Lüften aktivieren
-void AutotermPowerOnButton::press_action() {
-  ESP_LOGD("autoterm_uart", "Power ON button pressed");
-  if (parent_) parent_->send_power_on();
-}
-
-void AutotermFanModeButton::press_action() {
-  ESP_LOGD("autoterm_uart", "Fan Mode button pressed");
-  if (parent_) {
-    int level = parent_->fan_level_number_ ? (int)parent_->fan_level_number_->state : 8;
-    parent_->send_fan_mode(true, level);
-  }
-}
 
 // Number geändert → Level senden
 void AutotermFanLevelNumber::control(float value) {
@@ -486,68 +419,6 @@ void AutotermUART::send_status_request() {
 
   ESP_LOGD("autoterm_uart", "Requested status (CRC %04X)", crc);
   last_status_request_millis_ = millis();
-}
-
-void AutotermPowerOffButton::press_action() {
-  ESP_LOGD("autoterm_uart", "Power OFF button pressed");
-  if (parent_) parent_->send_power_off();
-}
-
-void AutotermUART::send_power_off() {
-  if (!this->uart_heater_) return;
-
-  const uint8_t header[] = {0xAA, 0x03, 0x00, 0x00, 0x03};
-  std::vector<uint8_t> frame(header, header + 5);
-
-  // CRC16 (Modbus)
-  uint16_t crc = 0xFFFF;
-  for (auto b : frame) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
-  }
-  frame.push_back((crc >> 8) & 0xFF);
-  frame.push_back(crc & 0xFF);
-
-  this->uart_heater_->write_array(frame);
-  this->uart_heater_->flush();
-
-  ESP_LOGD("autoterm_uart", "Sent Power OFF command (CRC %04X)", crc);
-}
-
-void AutotermUART::send_power_on() {
-  if (!this->uart_heater_) return;
-
-  const uint8_t header[] = {0xAA, 0x03, 0x06, 0x00, 0x01};
-  Settings payload_settings = settings_;
-  if (!settings_valid_) {
-    payload_settings = Settings{};
-  }
-
-  const uint8_t payload[] = {payload_settings.use_work_time,
-                             payload_settings.work_time,
-                             payload_settings.temperature_source,
-                             payload_settings.set_temperature,
-                             payload_settings.wait_mode,
-                             payload_settings.power_level};
-
-
-  std::vector<uint8_t> frame(header, header + 5);
-  frame.insert(frame.end(), payload, payload + sizeof(payload));
-
-  uint16_t crc = 0xFFFF;
-  for (auto b : frame) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
-  }
-  frame.push_back((crc >> 8) & 0xFF);
-  frame.push_back(crc & 0xFF);
-
-  this->uart_heater_->write_array(frame);
-  this->uart_heater_->flush();
-
-  ESP_LOGD("autoterm_uart", "Sent Power ON command (CRC %04X)", crc);
 }
 
 

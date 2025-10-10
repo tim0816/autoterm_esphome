@@ -37,10 +37,7 @@ class AutotermFanLevelNumber : public number::Number {
 
 class AutotermTempSourceSelect : public select::Select {
  public:
-  void set_parent(AutotermUART *parent) {
-    parent_ = parent;
-    this->traits_.set_options({"Intern", "Panel", "Extern", "Home Assistant"});
-  }
+  void set_parent(AutotermUART *parent);
   void publish_for_source(uint8_t source);
 
  protected:
@@ -308,6 +305,11 @@ class AutotermClimate : public climate::Climate {
 void AutotermFanLevelNumber::control(float value) {
   publish_state(value);
   if (parent_) parent_->send_fan_mode(true, (int)value);
+}
+
+void AutotermTempSourceSelect::set_parent(AutotermUART *parent) {
+  parent_ = parent;
+  this->traits_.set_options({"Intern", "Panel", "Extern", "Home Assistant"});
 }
 
 const char *AutotermTempSourceSelect::option_from_source_(uint8_t source) const {

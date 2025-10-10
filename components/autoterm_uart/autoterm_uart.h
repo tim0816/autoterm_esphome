@@ -388,11 +388,8 @@ void AutotermUART::set_temp_source_from_select(uint8_t source) {
   publish_temp_source_select_(clamped);
   if (changed) {
     ESP_LOGI("autoterm_uart", "Temperature source set via select to %u", static_cast<unsigned>(clamped));
-    if (climate_ != nullptr) {
-      AutotermUART::Settings shadow = settings_;
-      shadow.temperature_source = clamped;
-      climate_->handle_settings_update(shadow, true);
-    }
+    if (climate_ != nullptr)
+      climate_->publish_state();
   }
 }
 
@@ -959,17 +956,10 @@ void AutotermClimate::handle_status_update(uint16_t status_code, float internal_
 void AutotermClimate::handle_settings_update(const AutotermUART::Settings &settings, bool from_display) {
   if (!from_display)
     return;
-  AutotermUART::Settings effective = settings;
-  if (parent_ != nullptr) {
-    uint8_t manual = parent_->get_manual_temp_source();
-    if (manual >= 1 && manual <= 4)
-      effective.temperature_source = manual;
-  }
-
-  uint8_t level = clamp_level_(effective.power_level);
-  float target = clamp_temperature_(static_cast<float>(effective.set_temperature));
-  std::string preset = deduce_preset_from_settings_(effective);
-  climate::ClimateMode mode = deduce_mode_from_settings_(effective);
+  uint8_t level = clamp_level_(settings.power_level);
+  float target = clamp_temperature_(static_cast<float>(settings.set_temperature));
+  std::string preset = deduce_preset_from_settings_(settings);
+  climate::ClimateMode mode = deduce_mode_from_settings_(settings);
   apply_state_(mode, preset, level, target);
 }
 

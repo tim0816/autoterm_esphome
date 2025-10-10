@@ -4,10 +4,13 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/number/number.h"
+#include "esphome/components/climate/climate.h"
 #include "esphome/core/time.h"
 #include <vector>
 #include <string>
 #include <cmath>
+#include <algorithm>
+#include <cctype>
 
 namespace esphome {
 namespace autoterm_uart {
@@ -15,7 +18,8 @@ namespace autoterm_uart {
 using namespace esphome::uart;
 using namespace esphome::sensor;
 
-class AutotermUART;  // Vorwärtsdeklaration
+class AutotermUART;      // Vorwärtsdeklaration
+class AutotermClimate;   // Vorwärtsdeklaration
 
 // ===================
 // Custom Number Class
@@ -51,6 +55,7 @@ class AutotermUART : public Component {
 
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
+  AutotermClimate *climate_{nullptr};
 
   struct Settings {
     uint8_t use_work_time = 1;
@@ -95,6 +100,16 @@ class AutotermUART : public Component {
     fan_level_number_ = n;
     if (n) n->setup_parent(this);
   }
+  void set_climate(AutotermClimate *climate);
+
+  // Kommandos für Betriebsarten
+  void send_standby();
+  void send_power_mode(bool start, uint8_t level);
+  void send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp);
+  void send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp);
+  void send_fan_only(uint8_t level);
+  void send_thermostat_placeholder();
+
   void loop() override {
     uint32_t now = millis();
 
@@ -168,18 +183,9 @@ class AutotermUART : public Component {
   // CRC16 (Modbus)
   bool validate_crc(const std::vector<uint8_t> &data) {
     if (data.size() < 3) return false;
-    uint16_t crc = 0xFFFF;
-    for (size_t pos = 0; pos < data.size() - 2; pos++) {
-      crc ^= data[pos];
-      for (int i = 0; i < 8; i++) {
-        if (crc & 0x0001)
-          crc = (crc >> 1) ^ 0xA001;
-        else
-          crc >>= 1;
-      }
-    }
+    uint16_t expected = crc16_modbus_(data.data(), data.size() - 2);
     uint16_t recv_crc = (data[data.size() - 2] << 8) | data[data.size() - 1];
-    return crc == recv_crc;
+    return expected == recv_crc;
   }
 
   void log_frame(const char *tag, const std::vector<uint8_t> &data) {
@@ -202,6 +208,46 @@ public:
   void send_status_request();
   bool is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const;
   void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
+  bool send_command_(uint8_t command, const std::vector<uint8_t> &payload, const char *log_label);
+  uint16_t append_crc_(std::vector<uint8_t> &frame);
+  static uint16_t crc16_modbus_(const uint8_t *data, size_t length);
+};
+
+// ===================
+// Climate-Class
+// ===================
+class AutotermClimate : public climate::Climate {
+ public:
+  void set_parent(AutotermUART *parent);
+  void set_default_level(uint8_t level);
+  void set_default_temperature(float temperature_c);
+  void set_default_temp_sensor(uint8_t sensor);
+
+  void handle_status_update(uint16_t status_code, float internal_temp);
+  void handle_settings_update(const AutotermUART::Settings &settings);
+
+ protected:
+  climate::ClimateTraits traits() override;
+  void control(const climate::ClimateCall &call) override;
+
+ private:
+  AutotermUART *parent_{nullptr};
+  float target_temperature_c_{20.0f};
+  float current_temperature_c_{NAN};
+  uint8_t fan_level_{4};
+  uint8_t default_temp_sensor_{0x01};
+  std::string preset_mode_{"power"};
+
+  static uint8_t clamp_level_(int level);
+  static float clamp_temperature_(float temperature);
+  std::string fan_mode_label_from_level_(uint8_t level) const;
+  uint8_t fan_mode_label_to_level_(const std::string &label) const;
+  std::string sanitize_preset_(const std::string &preset) const;
+  uint8_t resolve_temp_sensor_() const;
+  climate::ClimateMode deduce_mode_from_settings_(const AutotermUART::Settings &settings) const;
+  std::string deduce_preset_from_settings_(const AutotermUART::Settings &settings) const;
+  void apply_state_(climate::ClimateMode mode, const std::string &preset, uint8_t level, float target_temp);
+  void update_action_from_status_(uint16_t status_code);
 };
 
 // ===================
@@ -296,6 +342,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   if (fan_speed_set_sensor_) fan_speed_set_sensor_->publish_state(fan_set_rpm);
   if (fan_speed_actual_sensor_) fan_speed_actual_sensor_->publish_state(fan_actual_rpm);
   if (pump_frequency_sensor_) pump_frequency_sensor_->publish_state(pump_freq);
+  if (climate_) climate_->handle_status_update(status_code, internal_temp);
 }
 
 void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
@@ -321,33 +368,17 @@ void AutotermUART::parse_settings(const std::vector<uint8_t> &data) {
     s.power_level = power_level;
     settings_ = s;
     settings_valid_ = true;
+    if (climate_) climate_->handle_settings_update(settings_);
   }
 }
 
 void AutotermUART::send_fan_mode(bool on, int level) {
-  if (!uart_heater_) return;
-  uint8_t payload[4] = {0xFF, 0xFF, (uint8_t)level, 0xFF};
-  uint8_t header[5] = {0xAA, 0x03, 0x04, 0x00, 0x23};
-
-  std::vector<uint8_t> frame;
-  frame.insert(frame.end(), header, header + 5);
-  frame.insert(frame.end(), payload, payload + 4);
-
-  // CRC16 (Modbus)
-  uint16_t crc = 0xFFFF;
-  for (auto b : frame) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  if (!on) {
+    send_standby();
+    return;
   }
-  frame.push_back((crc >> 8) & 0xFF);
-  frame.push_back(crc & 0xFF);
-
-  uart_heater_->write_array(frame);
-  uart_heater_->flush();
-
-  ESP_LOGD("autoterm_uart", "Sent Fan Mode %s, Level %d (CRC %04X)",
-           on ? "ON" : "OFF", level, crc);
+  int clamped = std::max(0, std::min(level, 9));
+  send_fan_only(static_cast<uint8_t>(clamped));
 }
 
 bool AutotermUART::is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const {
@@ -378,49 +409,383 @@ void AutotermUART::handle_panel_temperature_frame_(const std::vector<uint8_t> &f
     panel_temp_sensor_->publish_state(temperature_c);
 }
 
-void AutotermUART::request_settings() {
-  if (!uart_heater_) return;
-  const uint8_t header[] = {0xAA, 0x03, 0x00, 0x00, 0x02};
-  std::vector<uint8_t> frame(header, header + sizeof(header));
-
+uint16_t AutotermUART::crc16_modbus_(const uint8_t *data, size_t length) {
   uint16_t crc = 0xFFFF;
-  for (auto b : frame) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+  for (size_t pos = 0; pos < length; pos++) {
+    crc ^= data[pos];
+    for (int i = 0; i < 8; i++) {
+      if (crc & 0x0001)
+        crc = (crc >> 1) ^ 0xA001;
+      else
+        crc >>= 1;
+    }
   }
+  return crc;
+}
+
+uint16_t AutotermUART::append_crc_(std::vector<uint8_t> &frame) {
+  uint16_t crc = crc16_modbus_(frame.data(), frame.size());
   frame.push_back((crc >> 8) & 0xFF);
   frame.push_back(crc & 0xFF);
+  return crc;
+}
+
+bool AutotermUART::send_command_(uint8_t command, const std::vector<uint8_t> &payload, const char *log_label) {
+  if (!uart_heater_) {
+    ESP_LOGW("autoterm_uart", "UART heater not configured, skipping command 0x%02X", command);
+    return false;
+  }
+
+  std::vector<uint8_t> frame;
+  frame.reserve(5 + payload.size() + 2);
+  frame.push_back(0xAA);
+  frame.push_back(0x03);
+  frame.push_back(static_cast<uint8_t>(payload.size()));
+  frame.push_back(0x00);
+  frame.push_back(command);
+  frame.insert(frame.end(), payload.begin(), payload.end());
+
+  uint16_t crc = append_crc_(frame);
 
   uart_heater_->write_array(frame);
   uart_heater_->flush();
 
-  ESP_LOGD("autoterm_uart", "Requested settings (CRC %04X)", crc);
-  last_settings_request_millis_ = millis();
+  std::string payload_hex;
+  char temp[4];
+  for (auto byte : payload) {
+    snprintf(temp, sizeof(temp), "%02X", byte);
+    payload_hex += temp;
+    payload_hex += ' ';
+  }
+  if (!payload_hex.empty())
+    payload_hex.pop_back();
+
+  ESP_LOGD("autoterm_uart", "Sent %s (cmd=0x%02X len=%u payload=[%s] crc=%04X)",
+           log_label != nullptr ? log_label : "frame",
+           command, static_cast<unsigned>(payload.size()), payload_hex.c_str(), crc);
+  return true;
+}
+
+void AutotermUART::send_standby() {
+  send_command_(0x03, {}, "mode.standby");
+}
+
+void AutotermUART::send_power_mode(bool start, uint8_t level) {
+  uint8_t clamped_level = std::min<uint8_t>(level, 9);
+  std::vector<uint8_t> payload{0xFF, 0xFF, 0x04, 0xFF, 0x02, clamped_level};
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.power.start" : "mode.power.set");
+}
+
+void AutotermUART::send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
+  uint8_t sensor = std::max<uint8_t>(1, std::min<uint8_t>(temp_sensor, 3));
+  uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
+  std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x02, 0xFF};
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_hold.start" : "mode.temp_hold.set");
+}
+
+void AutotermUART::send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp) {
+  uint8_t sensor = std::max<uint8_t>(1, std::min<uint8_t>(temp_sensor, 3));
+  uint8_t temp_byte = std::min<uint8_t>(set_temp, 30);
+  std::vector<uint8_t> payload{0xFF, 0xFF, sensor, temp_byte, 0x01, 0xFF};
+  send_command_(start ? 0x01 : 0x02, payload, start ? "mode.temp_to_fan.start" : "mode.temp_to_fan.set");
+}
+
+void AutotermUART::send_fan_only(uint8_t level) {
+  uint8_t clamped_level = std::min<uint8_t>(level, 9);
+  std::vector<uint8_t> payload{0xFF, 0xFF, clamped_level, 0xFF};
+  send_command_(0x23, payload, "mode.fan_only");
+}
+
+void AutotermUART::send_thermostat_placeholder() {
+  ESP_LOGW("autoterm_uart", "Thermostat mode requested but not implemented yet");
+}
+
+void AutotermUART::request_settings() {
+  if (send_command_(0x02, {}, "request.settings"))
+    last_settings_request_millis_ = millis();
 }
 
 void AutotermUART::send_status_request() {
-  if (!uart_heater_) return;
+  if (send_command_(0x0F, {}, "request.status"))
+    last_status_request_millis_ = millis();
+}
+ 
+// ===================
+// AutotermClimate Implementierungen
+// ===================
 
-  const uint8_t header[] = {0xAA, 0x03, 0x00, 0x00, 0x0F};
-  std::vector<uint8_t> frame(header, header + sizeof(header));
-
-  uint16_t crc = 0xFFFF;
-  for (auto b : frame) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
-  }
-  frame.push_back((crc >> 8) & 0xFF);
-  frame.push_back(crc & 0xFF);
-
-  uart_heater_->write_array(frame);
-  uart_heater_->flush();
-
-  ESP_LOGD("autoterm_uart", "Requested status (CRC %04X)", crc);
-  last_status_request_millis_ = millis();
+void AutotermClimate::set_parent(AutotermUART *parent) {
+  parent_ = parent;
+  this->mode = climate::CLIMATE_MODE_OFF;
+  this->action = climate::CLIMATE_ACTION_OFF;
+  this->fan_mode = fan_mode_label_from_level_(fan_level_);
+  this->preset = preset_mode_;
+  this->target_temperature = target_temperature_c_;
+  if (!std::isnan(current_temperature_c_))
+    this->current_temperature = current_temperature_c_;
 }
 
+void AutotermClimate::set_default_level(uint8_t level) {
+  fan_level_ = clamp_level_(level);
+  this->fan_mode = fan_mode_label_from_level_(fan_level_);
+}
+
+void AutotermClimate::set_default_temperature(float temperature_c) {
+  target_temperature_c_ = clamp_temperature_(temperature_c);
+  this->target_temperature = target_temperature_c_;
+}
+
+void AutotermClimate::set_default_temp_sensor(uint8_t sensor) {
+  default_temp_sensor_ = std::max<uint8_t>(1, std::min<uint8_t>(sensor, 3));
+}
+
+climate::ClimateTraits AutotermClimate::traits() {
+  climate::ClimateTraits traits;
+  traits.set_supported_modes({
+      climate::CLIMATE_MODE_OFF,
+      climate::CLIMATE_MODE_HEAT,
+      climate::CLIMATE_MODE_FAN_ONLY,
+      climate::CLIMATE_MODE_AUTO,
+  });
+  traits.set_supported_presets({"power", "temp_hold", "temp_to_fan", "thermostat"});
+  std::vector<std::string> fan_modes;
+  fan_modes.reserve(10);
+  for (int i = 1; i <= 10; i++)
+    fan_modes.emplace_back(std::to_string(i));
+  traits.set_supported_fan_modes(fan_modes);
+  traits.set_visual_min_temperature(0.0f);
+  traits.set_visual_max_temperature(30.0f);
+  traits.set_visual_temperature_step(1.0f);
+  traits.set_supports_current_temperature(true);
+  return traits;
+}
+
+void AutotermClimate::control(const climate::ClimateCall &call) {
+  climate::ClimateMode new_mode = this->mode.value_or(climate::CLIMATE_MODE_OFF);
+  if (call.get_mode().has_value())
+    new_mode = *call.get_mode();
+
+  std::string new_preset = preset_mode_;
+  if (call.get_preset().has_value())
+    new_preset = sanitize_preset_(*call.get_preset());
+
+  uint8_t new_level = fan_level_;
+  if (call.get_fan_mode().has_value())
+    new_level = fan_mode_label_to_level_(*call.get_fan_mode());
+  new_level = clamp_level_(new_level);
+
+  float new_target_temp = target_temperature_c_;
+  if (call.get_target_temperature().has_value())
+    new_target_temp = clamp_temperature_(*call.get_target_temperature());
+
+  ESP_LOGD("autoterm_uart", "Climate control -> mode=%d preset=%s level=%u target=%.1f°C",
+           static_cast<int>(new_mode), new_preset.c_str(), new_level, new_target_temp);
+
+  if (!parent_) {
+    ESP_LOGW("autoterm_uart", "Climate control requested without parent link");
+    apply_state_(new_mode, new_preset, new_level, new_target_temp);
+    return;
+  }
+
+  climate::ClimateMode previous_mode = this->mode.value_or(climate::CLIMATE_MODE_OFF);
+  bool should_start = previous_mode == climate::CLIMATE_MODE_OFF ||
+                      previous_mode == climate::CLIMATE_MODE_FAN_ONLY ||
+                      !parent_->settings_valid_;
+
+  if (new_mode == climate::CLIMATE_MODE_OFF) {
+    parent_->send_standby();
+  } else if (new_mode == climate::CLIMATE_MODE_FAN_ONLY) {
+    if (previous_mode != climate::CLIMATE_MODE_OFF)
+      parent_->send_standby();
+    parent_->send_fan_only(new_level);
+  } else {
+    if (previous_mode == climate::CLIMATE_MODE_FAN_ONLY)
+      parent_->send_standby();
+
+    if (new_preset == "power") {
+      parent_->send_power_mode(should_start, new_level);
+    } else if (new_preset == "temp_hold") {
+      uint8_t sensor = resolve_temp_sensor_();
+      uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
+      parent_->send_temperature_hold_mode(should_start, sensor, temp_byte);
+    } else if (new_preset == "temp_to_fan") {
+      uint8_t sensor = resolve_temp_sensor_();
+      uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
+      parent_->send_temperature_to_fan_mode(should_start, sensor, temp_byte);
+    } else if (new_preset == "thermostat") {
+      parent_->send_thermostat_placeholder();
+    }
+  }
+
+  apply_state_(new_mode, new_preset, new_level, new_target_temp);
+}
+
+void AutotermClimate::handle_status_update(uint16_t status_code, float internal_temp) {
+  bool changed = false;
+  if (!std::isnan(internal_temp)) {
+    if (std::isnan(current_temperature_c_) || std::fabs(internal_temp - current_temperature_c_) > 0.1f) {
+      current_temperature_c_ = internal_temp;
+      this->current_temperature = internal_temp;
+      changed = true;
+    }
+  }
+
+  auto previous_action = this->action;
+  update_action_from_status_(status_code);
+  if (!previous_action.has_value() || this->action != previous_action)
+    changed = true;
+
+  if (changed)
+    this->publish_state();
+}
+
+void AutotermClimate::handle_settings_update(const AutotermUART::Settings &settings) {
+  uint8_t level = clamp_level_(settings.power_level);
+  float target = clamp_temperature_(static_cast<float>(settings.set_temperature));
+  std::string preset = deduce_preset_from_settings_(settings);
+  climate::ClimateMode mode = deduce_mode_from_settings_(settings);
+  apply_state_(mode, preset, level, target);
+}
+
+uint8_t AutotermClimate::clamp_level_(int level) {
+  if (level < 0)
+    return 0;
+  if (level > 9)
+    return 9;
+  return static_cast<uint8_t>(level);
+}
+
+float AutotermClimate::clamp_temperature_(float temperature) {
+  if (temperature < 0.0f)
+    return 0.0f;
+  if (temperature > 30.0f)
+    return 30.0f;
+  return temperature;
+}
+
+std::string AutotermClimate::fan_mode_label_from_level_(uint8_t level) const {
+  level = clamp_level_(level);
+  return std::to_string(static_cast<int>(level) + 1);
+}
+
+uint8_t AutotermClimate::fan_mode_label_to_level_(const std::string &label) const {
+  if (label.empty())
+    return fan_level_;
+  int value = 0;
+  for (char c : label) {
+    if (!std::isdigit(static_cast<unsigned char>(c)))
+      return fan_level_;
+    value = value * 10 + (c - '0');
+  }
+  if (value <= 0)
+    return fan_level_;
+  return clamp_level_(value - 1);
+}
+
+std::string AutotermClimate::sanitize_preset_(const std::string &preset) const {
+  if (preset == "power" || preset == "temp_hold" || preset == "temp_to_fan" || preset == "thermostat")
+    return preset;
+  return preset_mode_;
+}
+
+uint8_t AutotermClimate::resolve_temp_sensor_() const {
+  if (parent_ != nullptr && parent_->settings_valid_) {
+    uint8_t src = parent_->settings_.temperature_source;
+    if (src >= 1 && src <= 3)
+      return src;
+  }
+  return std::max<uint8_t>(1, std::min<uint8_t>(default_temp_sensor_, static_cast<uint8_t>(3)));
+}
+
+climate::ClimateMode AutotermClimate::deduce_mode_from_settings_(const AutotermUART::Settings &settings) const {
+  if (settings.wait_mode == 0x00 && settings.power_level == 0)
+    return climate::CLIMATE_MODE_OFF;
+  if (settings.temperature_source == 0x04)
+    return climate::CLIMATE_MODE_HEAT;
+  if (settings.wait_mode == 0x01)
+    return climate::CLIMATE_MODE_AUTO;
+  if (settings.wait_mode == 0x02)
+    return climate::CLIMATE_MODE_HEAT;
+  return this->mode.value_or(climate::CLIMATE_MODE_OFF);
+}
+
+std::string AutotermClimate::deduce_preset_from_settings_(const AutotermUART::Settings &settings) const {
+  if (settings.temperature_source == 0x04)
+    return "power";
+  if (settings.wait_mode == 0x01)
+    return "temp_to_fan";
+  if (settings.wait_mode == 0x02)
+    return "temp_hold";
+  return preset_mode_;
+}
+
+void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string &preset, uint8_t level, float target_temp) {
+  preset_mode_ = sanitize_preset_(preset);
+  fan_level_ = clamp_level_(level);
+  target_temperature_c_ = clamp_temperature_(target_temp);
+
+  this->mode = mode;
+  this->preset = preset_mode_;
+  this->fan_mode = fan_mode_label_from_level_(fan_level_);
+  this->target_temperature = target_temperature_c_;
+  if (!std::isnan(current_temperature_c_))
+    this->current_temperature = current_temperature_c_;
+
+  if (mode == climate::CLIMATE_MODE_OFF)
+    this->action = climate::CLIMATE_ACTION_OFF;
+  else if (mode == climate::CLIMATE_MODE_FAN_ONLY)
+    this->action = climate::CLIMATE_ACTION_FAN;
+  else
+    this->action = climate::CLIMATE_ACTION_HEATING;
+
+  this->publish_state();
+}
+
+void AutotermClimate::update_action_from_status_(uint16_t status_code) {
+  climate::ClimateAction action = climate::CLIMATE_ACTION_IDLE;
+  switch (status_code) {
+    case 0x0000:
+    case 0x0001:
+      action = this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_OFF
+                   ? climate::CLIMATE_ACTION_OFF
+                   : climate::CLIMATE_ACTION_IDLE;
+      break;
+    case 0x0101:
+    case 0x0323:
+      action = climate::CLIMATE_ACTION_FAN;
+      break;
+    case 0x0200:
+    case 0x0201:
+    case 0x0202:
+    case 0x0203:
+    case 0x0204:
+    case 0x0300:
+      action = climate::CLIMATE_ACTION_HEATING;
+      break;
+    case 0x0304:
+    case 0x0400:
+      action = climate::CLIMATE_ACTION_IDLE;
+      break;
+    default:
+      if (this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_OFF)
+        action = climate::CLIMATE_ACTION_OFF;
+      else if (this->mode.value_or(climate::CLIMATE_MODE_OFF) == climate::CLIMATE_MODE_FAN_ONLY)
+        action = climate::CLIMATE_ACTION_FAN;
+      else
+        action = climate::CLIMATE_ACTION_IDLE;
+      break;
+  }
+  this->action = action;
+}
+
+void AutotermUART::set_climate(AutotermClimate *climate) {
+  climate_ = climate;
+  if (climate_ != nullptr) {
+    climate_->set_parent(this);
+    if (settings_valid_)
+      climate_->handle_settings_update(settings_);
+  }
+}
 
 }  // namespace autoterm_uart
 }  // namespace esphome

@@ -85,3 +85,8 @@ autoterm_uart:
   pump_frequency:
     name: "Pump Frequency"
     unit_of_measurement: "Hz"
+  climate:
+    name: "Autoterm Climate"
+    default_level: 4
+    default_temperature: 20 °C
+    default_temp_sensor: 1

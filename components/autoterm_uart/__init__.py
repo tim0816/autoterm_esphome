@@ -5,12 +5,27 @@ import esphome.components.uart as uart
 import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
+import esphome.components.climate as climate
 
-DEPENDENCIES = ["sensor", "text_sensor", "number"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "climate"]
+AUTO_LOAD = ["climate"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
+AutotermClimate = autoterm_ns.class_("AutotermClimate", climate.Climate)
+
+CONF_CLIMATE = "climate"
+CONF_DEFAULT_LEVEL = "default_level"
+CONF_DEFAULT_TEMPERATURE = "default_temperature"
+CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
+
+CLIMATE_SCHEMA = climate.CLIMATE_SCHEMA.extend({
+    cv.GenerateID(): cv.declare_id(AutotermClimate),
+    cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
+    cv.Optional(CONF_DEFAULT_TEMPERATURE, default=20.0): cv.temperature,
+    cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=1): cv.int_range(min=1, max=3),
+})
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AutotermUART),
@@ -31,6 +46,7 @@ CONFIG_SCHEMA = cv.Schema({
 
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
 
+    cv.Optional(CONF_CLIMATE): CLIMATE_SCHEMA,
 
 })
 
@@ -73,3 +89,13 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_fan_level_number(num))
+
+    if CONF_CLIMATE in config:
+        climate_conf = config[CONF_CLIMATE]
+        clim = cg.new_Pvariable(climate_conf[const.CONF_ID])
+        await cg.register_component(clim, climate_conf)
+        await climate.register_climate(clim, climate_conf)
+        cg.add(clim.set_default_level(climate_conf[CONF_DEFAULT_LEVEL]))
+        cg.add(clim.set_default_temperature(climate_conf[CONF_DEFAULT_TEMPERATURE]))
+        cg.add(clim.set_default_temp_sensor(climate_conf[CONF_DEFAULT_TEMP_SENSOR]))
+        cg.add(var.set_climate(clim))

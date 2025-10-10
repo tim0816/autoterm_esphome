@@ -116,6 +116,7 @@ CRC-Berechnung siehe Quellen.
 | `0x0300` | heating |
 | `0x0323` | only fan |
 | `0x0304` | cooling down |
+| `0x0305` | idle venting |
 | `0x0400` | shutting down |
 | *andere* | unknown (HEX-Code wird mit angezeigt) |
 

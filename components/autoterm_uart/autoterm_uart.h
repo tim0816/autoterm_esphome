@@ -41,7 +41,7 @@ class AutotermTempSourceSelect : public select::Select {
   void publish_for_source(uint8_t source);
 
  protected:
-  select::SelectTraits traits() override;
+  select::SelectTraits get_traits() override;
   void control(const std::string &value) override;
 
  private:
@@ -308,7 +308,7 @@ void AutotermFanLevelNumber::control(float value) {
   if (parent_) parent_->send_fan_mode(true, (int)value);
 }
 
-select::SelectTraits AutotermTempSourceSelect::traits() {
+select::SelectTraits AutotermTempSourceSelect::get_traits() {
   select::SelectTraits traits;
   traits.set_options({"Intern", "Panel", "Extern", "Home Assistant"});
   return traits;

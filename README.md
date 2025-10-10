@@ -55,6 +55,27 @@ Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfig
 
 ---
 
+## 🧩 Entitäten in Home Assistant
+
+| Typ | Name (Standard) | Beschreibung |
+|------|----------------|--------------|
+| Climate | Autoterm Climate | Vollständiges Climate-Entity mit Modi, Presets und Zieltemperatur |
+| Sensor | Internal Temperature | Temperatur im Heizgerät (°C) |
+| Sensor | External Temperature | Externer Temperaturfühler (°C) |
+| Sensor | Heater Temperature | Temperatur am Wärmetauscher (°C) |
+| Sensor | Panel Temperature | Panel-/Display-Temperatur (°C, real oder virtuell) |
+| Sensor | Voltage | Versorgungsspannung der Heizung (V) |
+| Sensor | Fan RPM Set | Angeforderte Lüfterdrehzahl (rpm) |
+| Sensor | Fan RPM Actual | Gemessene Lüfterdrehzahl (rpm) |
+| Sensor | Pump Frequency | Takt der Dosierpumpe (Hz) |
+| Text Sensor | Status Text | Klartextstatus, inklusive HEX-Fallback bei unbekannten Codes |
+| Number | Fan Level | Direkte Vorgabe der Lüfterstufe (0–9) |
+| Select | Temperature Source | Auswahl der Temperaturquelle (Intern/Panel/Extern/Home Assistant) |
+
+Für ein Panel-Temperatur-Override kann zusätzlich ein bestehender Sensor (z. B. aus Home Assistant) eingebunden und unter `panel_temp_override.sensor` referenziert werden. Dieser wird genutzt, wenn die Temperaturquelle „Home Assistant“ gewählt ist.
+
+---
+
 ## 🧠 UART-Kommunikation im Detail
  
 Jede Nachricht (Frame) hat folgenden Aufbau:
@@ -243,27 +264,6 @@ Wenn der ESP kein Bedienteil erkennt, sendet er regelmäßig eigene Requests:
 | `0x03` | Display → Heater | 0 B | Standby (Power OFF) |
 | `0x11` | Display ↔ Heater | 1 B | Panel-Temperatur |
 | `0x23` | Display → Heater | 4 B | Fan-Only-Modus |
-
----
-
-## 🧩 Entitäten in Home Assistant
-
-| Typ | Name (Standard) | Beschreibung |
-|------|----------------|--------------|
-| Climate | Autoterm Climate | Vollständiges Climate-Entity mit Modi, Presets und Zieltemperatur |
-| Sensor | Internal Temperature | Temperatur im Heizgerät (°C) |
-| Sensor | External Temperature | Externer Temperaturfühler (°C) |
-| Sensor | Heater Temperature | Temperatur am Wärmetauscher (°C) |
-| Sensor | Panel Temperature | Panel-/Display-Temperatur (°C, real oder virtuell) |
-| Sensor | Voltage | Versorgungsspannung der Heizung (V) |
-| Sensor | Fan RPM Set | Angeforderte Lüfterdrehzahl (rpm) |
-| Sensor | Fan RPM Actual | Gemessene Lüfterdrehzahl (rpm) |
-| Sensor | Pump Frequency | Takt der Dosierpumpe (Hz) |
-| Text Sensor | Status Text | Klartextstatus, inklusive HEX-Fallback bei unbekannten Codes |
-| Number | Fan Level | Direkte Vorgabe der Lüfterstufe (0–9) |
-| Select | Temperature Source | Auswahl der Temperaturquelle (Intern/Panel/Extern/Home Assistant) |
-
-Für ein Panel-Temperatur-Override kann zusätzlich ein bestehender Sensor (z. B. aus Home Assistant) eingebunden und unter `panel_temp_override.sensor` referenziert werden. Dieser wird genutzt, wenn die Temperaturquelle „Home Assistant“ gewählt ist.
 
 ---
 

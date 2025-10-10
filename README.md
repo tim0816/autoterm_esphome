@@ -32,19 +32,16 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
   Offener Leistungsbetrieb: Die Heizung arbeitet ausschließlich mit der gewählten Stufe (`0–9`) und ignoriert Zieltemperaturen. Ideal zum schnellen Aufheizen oder wenn dauerhaft hohe Leistung benötigt wird.
 
 - **Heizen**  
-  Stufenregelung bis zur Zieltemperatur: Die Heizung nutzt die gewählte Temperaturquelle, erhöht die Leistung bis der Sollwert erreicht ist und läuft anschließend dauerhaft in der niedrigsten Stufe weiter (kein echtes Ein/Aus-Thermostat). Die entsprechenden Kommandos (`0x01/0x02`) enthalten Sensor-ID und Zieltemperatur.
+  Stufenregelung bis zur Zieltemperatur: Die Heizung nutzt die gewählte Temperaturquelle, erhöht die Leistung bis der Sollwert erreicht ist und läuft anschließend dauerhaft in der niedrigsten Stufe weiter.
 
 - **Heizen+Lüften**  
   Hybridmodus: Die Heizung startet im Heizbetrieb, reduziert aber auf reinen Lüfterbetrieb, sobald die Zieltemperatur erreicht ist. Sobald es kühler wird, schaltet sie automatisch wieder auf Heizen. Intern wird `wait_mode = 0x01` genutzt.
 
 - **Fan Only**  
-  Entspricht dem „Nur Lüften“-Modus der originalen Bedieneinheit. Der Brenner bleibt aus, lediglich der Lüfter läuft mit der vorgegebenen Stufe (`0–9`). Umsetzung über UART-Kommando `0x23`.
+  Entspricht dem „Nur Lüften“-Modus der originalen Bedieneinheit. Der Brenner bleibt aus, lediglich der Lüfter läuft mit der vorgegebenen Stufe (`0–9`). 
 
 - **Thermostat (Platzhalter)**  
   Vorgesehen für zukünftige Protokollerweiterungen. Der Code sendet derzeit nur einen Hinweis im Log (`send_thermostat_placeholder()`), echte Heizlogik ist noch nicht implementiert.
-
-- **Idle Ventilation**  
-  Statuscode `0x0305` signalisiert, dass die Heizung im Leerlauf mit Lüfterbetrieb läuft – meist nachwärmend oder zur Luftzirkulation. Dieser Zustand wird als Textsensor „idle ventilation“ veröffentlicht. 
 
 Jeder Modus kann über das Climate-Entity oder automatisiert per ESPHome/Home Assistant gesteuert werden. Nach Wechseln von Presets aktualisiert die Firmware die internen Settings und sendet passende UART-Frames an die Heizung.
 

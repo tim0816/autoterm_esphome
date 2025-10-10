@@ -780,7 +780,7 @@ bool AutotermUART::send_command_(uint8_t command, const std::vector<uint8_t> &pa
   if (!payload_hex.empty())
     payload_hex.pop_back();
 
-  ESP_LOGD("autoterm_uart", "Sent %s (cmd=0x%02X len=%u payload=[%s] crc=%04X)",
+  ESP_LOGW("autoterm_uart", "Sent %s (cmd=0x%02X len=%u payload=[%s] crc=%04X)",
            log_label != nullptr ? log_label : "frame",
            command, static_cast<unsigned>(payload.size()), payload_hex.c_str(), crc);
   return true;

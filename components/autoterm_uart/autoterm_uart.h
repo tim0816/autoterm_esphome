@@ -261,6 +261,7 @@ public:
   void publish_temp_source_select_(uint8_t source);
   uint8_t clamp_temp_source_(uint8_t source) const;
   bool should_force_temp_source_() const;
+  uint8_t map_manual_source_to_heater_(uint8_t source) const;
 };
 
 // ===================
@@ -504,6 +505,21 @@ bool AutotermUART::should_force_temp_source_() const {
   return manual_temp_source_active_ && manual_temp_source_value_ >= 1 && manual_temp_source_value_ <= 4;
 }
 
+uint8_t AutotermUART::map_manual_source_to_heater_(uint8_t source) const {
+  switch (clamp_temp_source_(source)) {
+    case 1:
+      return 0x01;
+    case 2:
+      return 0x02;
+    case 3:
+      return 0x03;
+    case 4:
+      return 0x02;  // Home Assistant meldet sich gegenüber der Heizung als Panelsensor
+    default:
+      return 0x01;
+  }
+}
+
 void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
   if (!should_force_temp_source_())
     return;
@@ -517,7 +533,7 @@ void AutotermUART::apply_temp_source_override_(std::vector<uint8_t> &frame) {
   size_t payload_index = 5;
   if (frame.size() <= payload_index + 2)
     return;
-  uint8_t desired = clamp_temp_source_(manual_temp_source_value_);
+  uint8_t desired = map_manual_source_to_heater_(manual_temp_source_value_);
   uint8_t current = frame[payload_index + 2];
   if (current == desired)
     return;

@@ -1089,18 +1089,18 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
 
   if (!preset_overridden) {
     switch (new_mode) {
-      case climate::CLIMATE_MODE_HEAT:
-        new_preset = "Heizen";
-        break;
-      case climate::CLIMATE_MODE_AUTO:
-        new_preset = "Heizen+Lüften";
-        break;
       case climate::CLIMATE_MODE_FAN_ONLY:
       case climate::CLIMATE_MODE_OFF:
         new_preset.clear();
         break;
+      case climate::CLIMATE_MODE_AUTO:
+        if (new_preset.empty())
+          new_preset = "Heizen+Lüften";
+        break;
+      case climate::CLIMATE_MODE_HEAT:
       default:
-        new_preset = "Leistungsmodus";
+        if (new_preset.empty())
+          new_preset = "Leistungsmodus";
         break;
     }
     if (!new_preset.empty())

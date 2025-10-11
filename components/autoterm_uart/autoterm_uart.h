@@ -95,6 +95,7 @@ class AutotermUART : public Component {
   uint32_t last_display_activity_{0};
   uint32_t last_status_request_millis_{0};
   uint32_t last_settings_request_millis_{0};
+  uint32_t last_panel_temp_send_millis_{0};
   float panel_temp_last_value_c_{NAN};
   std::vector<uint8_t> display_to_heater_buffer_;
   std::vector<uint8_t> heater_to_display_buffer_;
@@ -154,6 +155,9 @@ class AutotermUART : public Component {
       if (connected) {
         last_status_request_millis_ = now;
         last_settings_request_millis_ = now;
+        last_panel_temp_send_millis_ = now;
+      } else {
+        last_panel_temp_send_millis_ = 0;
       }
     }
 
@@ -165,6 +169,12 @@ class AutotermUART : public Component {
       if (now - last_settings_request_millis_ >= 10000) {
         request_settings();
         last_settings_request_millis_ = now;
+      }
+      if (should_override_panel_temperature_() && std::isfinite(panel_temp_override_value_c_)) {
+        if (last_panel_temp_send_millis_ == 0 || (now - last_panel_temp_send_millis_) >= 1000) {
+          send_panel_temperature_override_frame_();
+          last_panel_temp_send_millis_ = now;
+        }
       }
     }
   }
@@ -247,6 +257,7 @@ public:
  protected:
   void request_settings();
   void send_status_request();
+  void send_panel_temperature_override_frame_();
   bool is_panel_temperature_frame_(const std::vector<uint8_t> &frame) const;
   void handle_panel_temperature_frame_(const std::vector<uint8_t> &frame);
   void process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display);
@@ -832,7 +843,29 @@ void AutotermUART::send_status_request() {
   if (send_command_(0x0F, {}, "request.status"))
     last_status_request_millis_ = millis();
 }
- 
+
+void AutotermUART::send_panel_temperature_override_frame_() {
+  if (!uart_heater_)
+    return;
+  if (!std::isfinite(panel_temp_override_value_c_))
+    return;
+
+  uint8_t temp_byte = compute_override_temperature_byte_();
+
+  std::vector<uint8_t> frame{0xAA, 0x03, 0x01, 0x00, 0x11, temp_byte};
+  append_crc_(frame);
+
+  uart_heater_->write_array(frame);
+  uart_heater_->flush();
+
+  panel_temp_last_value_c_ = panel_temp_override_value_c_;
+  if (panel_temp_sensor_ != nullptr)
+    panel_temp_sensor_->publish_state(panel_temp_override_value_c_);
+
+  ESP_LOGD("autoterm_uart", "Panel temperature override frame sent: byte=%u (%.1f°C)",
+           static_cast<unsigned>(temp_byte), panel_temp_override_value_c_);
+}
+
 // ===================
 // AutotermClimate Implementierungen
 // ===================

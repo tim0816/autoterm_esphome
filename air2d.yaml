@@ -88,6 +88,9 @@ autoterm_uart:
   pump_frequency:
     name: "Pump Frequency"
     unit_of_measurement: "Hz"
+  runtime_hours:
+    name: "Betriebsstunden"
+    accuracy_decimals: 2
   fan_level:
     name: "Fan Level"
   panel_temp_override:

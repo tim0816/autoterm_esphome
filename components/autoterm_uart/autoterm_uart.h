@@ -7,6 +7,8 @@
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/select/select.h"
 #include "esphome/core/time.h"
+#include "esphome/core/preferences.h"
+#include "esphome/core/helpers.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -81,6 +83,17 @@ class AutotermUART : public Component {
 
   AutotermFanLevelNumber *fan_level_number_{nullptr};
   AutotermClimate *climate_{nullptr};
+  Sensor *runtime_hours_sensor_{nullptr};
+  ESPPreferenceObject runtime_hours_pref_;
+  float runtime_hours_{0.0f};
+  float runtime_hours_last_published_{NAN};
+  bool runtime_loaded_{false};
+  bool runtime_dirty_{false};
+  bool runtime_tracking_initialized_{false};
+  bool runtime_storage_initialized_{false};
+  bool heater_running_{false};
+  uint32_t last_runtime_millis_{0};
+  uint32_t last_runtime_save_millis_{0};
 
   struct Settings {
     uint8_t use_work_time = 1;
@@ -119,6 +132,7 @@ class AutotermUART : public Component {
     }
   }
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
+  void set_runtime_hours_sensor(Sensor *s);
 
   void set_panel_temp_override_sensor(Sensor *s);
   void set_temp_source_select(AutotermTempSourceSelect *select);
@@ -178,9 +192,33 @@ class AutotermUART : public Component {
         }
       }
     }
+
+    uint32_t runtime_now = millis();
+    advance_runtime_time_(runtime_now);
+    maybe_save_runtime_hours_(runtime_now);
   }
 
   void setup() override {
+    if (global_preferences != nullptr) {
+      runtime_hours_pref_ =
+          global_preferences->make_preference<float>(fnv1_hash("autoterm_uart_runtime_hours"));
+      runtime_storage_initialized_ = true;
+      if (!runtime_hours_pref_.load(&runtime_hours_)) {
+        runtime_hours_ = 0.0f;
+      }
+    } else {
+      runtime_storage_initialized_ = false;
+      runtime_hours_ = 0.0f;
+    }
+    runtime_loaded_ = true;
+    runtime_hours_last_published_ = NAN;
+    publish_runtime_hours_(true);
+
+    uint32_t now = millis();
+    last_runtime_millis_ = now;
+    last_runtime_save_millis_ = now;
+    runtime_tracking_initialized_ = true;
+
     request_settings();
   }
 
@@ -274,6 +312,11 @@ public:
   uint8_t clamp_temp_source_(uint8_t source) const;
   bool should_force_temp_source_() const;
   uint8_t map_source_to_heater_(uint8_t source) const;
+  void advance_runtime_time_(uint32_t now);
+  void set_heater_running_state_(bool running);
+  void publish_runtime_hours_(bool force = false);
+  void maybe_save_runtime_hours_(uint32_t now, bool force = false);
+  bool is_heater_active_status_(uint16_t status_code) const;
 };
 
 // ===================
@@ -375,6 +418,12 @@ void AutotermTempSourceSelect::control(const std::string &value) {
   parent_->set_temp_source_from_select(src);
 }
 
+void AutotermUART::set_runtime_hours_sensor(Sensor *s) {
+  runtime_hours_sensor_ = s;
+  if (runtime_hours_sensor_ != nullptr && runtime_loaded_)
+    publish_runtime_hours_(true);
+}
+
 void AutotermUART::set_panel_temp_override_sensor(Sensor *s) {
   panel_temp_override_sensor_ = s;
   if (panel_temp_override_sensor_ != nullptr) {
@@ -454,6 +503,77 @@ float AutotermUART::get_temperature_for_source(uint8_t source) const {
   if (std::isfinite(last_external_temp_c_))
     return last_external_temp_c_;
   return NAN;
+}
+
+void AutotermUART::advance_runtime_time_(uint32_t now) {
+  if (!runtime_tracking_initialized_) {
+    last_runtime_millis_ = now;
+    runtime_tracking_initialized_ = true;
+    return;
+  }
+
+  uint32_t delta = now - last_runtime_millis_;
+  last_runtime_millis_ = now;
+
+  if (!heater_running_ || delta == 0)
+    return;
+
+  runtime_hours_ += static_cast<float>(delta) / 3600000.0f;
+  runtime_dirty_ = true;
+  publish_runtime_hours_();
+}
+
+void AutotermUART::set_heater_running_state_(bool running) {
+  if (heater_running_ == running)
+    return;
+
+  uint32_t now = millis();
+  advance_runtime_time_(now);
+  heater_running_ = running;
+  last_runtime_millis_ = now;
+
+  if (!heater_running_) {
+    publish_runtime_hours_(true);
+    maybe_save_runtime_hours_(now, true);
+  }
+}
+
+void AutotermUART::publish_runtime_hours_(bool force) {
+  if (!runtime_loaded_ || runtime_hours_sensor_ == nullptr)
+    return;
+
+  bool should_publish = force;
+  if (!should_publish) {
+    if (std::isnan(runtime_hours_last_published_) ||
+        std::fabs(runtime_hours_ - runtime_hours_last_published_) >= 0.001f) {
+      should_publish = true;
+    }
+  }
+
+  if (!should_publish)
+    return;
+
+  runtime_hours_sensor_->publish_state(runtime_hours_);
+  runtime_hours_last_published_ = runtime_hours_;
+}
+
+void AutotermUART::maybe_save_runtime_hours_(uint32_t now, bool force) {
+  if (!runtime_dirty_ || !runtime_storage_initialized_)
+    return;
+
+  if (!force && (now - last_runtime_save_millis_) < 60000)
+    return;
+
+  if (runtime_hours_pref_.save(&runtime_hours_)) {
+    runtime_dirty_ = false;
+    last_runtime_save_millis_ = now;
+  }
+}
+
+bool AutotermUART::is_heater_active_status_(uint16_t status_code) const {
+  if (status_code == 0x0000 || status_code == 0x0001)
+    return false;
+  return true;
 }
 
 void AutotermUART::process_frame_(std::vector<uint8_t> frame, UARTComponent *dst, const char *tag, bool from_display) {
@@ -662,6 +782,8 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   ESP_LOGD("autoterm_uart",
            "Status: %s (0x%02X%02X) | U=%.1fV | Heater %.0f°C | Fan %.0f/%.0f rpm | Pump %.2f Hz",
            status_txt, s_hi, s_lo, voltage, heater_temp, fan_actual_rpm, fan_set_rpm, pump_freq);
+
+  set_heater_running_state_(is_heater_active_status_(status_code));
 
   if (internal_temp_sensor_) internal_temp_sensor_->publish_state(internal_temp);
   if (external_temp_sensor_) external_temp_sensor_->publish_state(external_temp);

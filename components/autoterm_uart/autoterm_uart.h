@@ -733,51 +733,51 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   float fan_actual_rpm = fan_actual_raw * 60.0f;
   float pump_freq = pump_raw / 100.0f;
 
-  const char *status_txt = "unknown";
+  const char *status_txt = "Unbekannt";
   switch (status_code) {
     case 0x0001:
-      status_txt = "standby";
+      status_txt = "Standby";
       break;
     case 0x0100:
-      status_txt = "cooling flame sensor";
+      status_txt = "Flammensensor kühlt";
       break;
     case 0x0101:
-      status_txt = "ventilation";
+      status_txt = "Lüftung";
       break;
    case 0x0200:
-      status_txt = "prepare heating";
+      status_txt = "Heizung wird vorbereitet";
       break;
     case 0x0201:
-      status_txt = "heating glow plug";
+      status_txt = "Glühkerze heizt";
       break;
     case 0x0202:
-      status_txt = "ignition 1";
+      status_txt = "Zündung 1";
       break;
     case 0x0203:
-      status_txt = "ignition 2";
+      status_txt = "Zündung 2";
       break;
     case 0x0204:
-      status_txt = "heating combustion chamber";
+      status_txt = "Brennkammer heizt";
       break;
     case 0x0300:
-      status_txt = "heating";
+      status_txt = "Heizen";
       break;
     case 0x0323:
-      status_txt = "only fan";
+      status_txt = "Nur Lüfter";
       break;
     case 0x0304:
-      status_txt = "cooling down";
+      status_txt = "Kühlt ab";
       break;
     case 0x0305:
-      status_txt = "idle ventilation";
+      status_txt = "Nachlauf-Lüftung";
       break;
     case 0x0400:
-      status_txt = "shutting down";
+      status_txt = "Herunterfahren";
       break;
     default:
       // Wenn unbekannter Status, erweitere Textausgabe um HEX-Werte
       static char unknown_buf[32];
-      snprintf(unknown_buf, sizeof(unknown_buf), "unknown (0x%02X%02X)", s_hi, s_lo);
+      snprintf(unknown_buf, sizeof(unknown_buf), "Unbekannt (0x%02X%02X)", s_hi, s_lo);
       status_txt = unknown_buf;
       break;
   }

@@ -54,6 +54,13 @@ CONFIG_SCHEMA = cv.Schema({
         device_class=const.DEVICE_CLASS_DURATION,
         state_class=const.STATE_CLASS_TOTAL_INCREASING,
     ),
+    cv.Optional("session_runtime"): sensor.sensor_schema(
+        unit_of_measurement="h",
+        icon="mdi:timer-outline",
+        accuracy_decimals=2,
+        device_class=const.DEVICE_CLASS_DURATION,
+        state_class=const.STATE_CLASS_MEASUREMENT,
+    ),
 
     cv.Optional("status_text"): text_sensor.text_sensor_schema(icon="mdi:information"),
 
@@ -87,6 +94,7 @@ async def to_code(config):
         ("fan_speed_actual", "set_fan_speed_actual_sensor"),
         ("pump_frequency", "set_pump_frequency_sensor"),
         ("runtime_hours", "set_runtime_hours_sensor"),
+        ("session_runtime", "set_session_runtime_sensor"),
     ]:
         if key in config:
             sens = await sensor.new_sensor(config[key])

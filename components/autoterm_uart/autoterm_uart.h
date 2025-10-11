@@ -84,9 +84,12 @@ class AutotermUART : public Component {
   AutotermFanLevelNumber *fan_level_number_{nullptr};
   AutotermClimate *climate_{nullptr};
   Sensor *runtime_hours_sensor_{nullptr};
+  Sensor *session_runtime_sensor_{nullptr};
   ESPPreferenceObject runtime_hours_pref_;
   float runtime_hours_{0.0f};
   float runtime_hours_last_published_{NAN};
+  float session_runtime_hours_{0.0f};
+  float session_runtime_last_published_{NAN};
   bool runtime_loaded_{false};
   bool runtime_dirty_{false};
   bool runtime_tracking_initialized_{false};
@@ -133,6 +136,7 @@ class AutotermUART : public Component {
   }
   void set_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor_ = s; }
   void set_runtime_hours_sensor(Sensor *s);
+  void set_session_runtime_sensor(Sensor *s);
 
   void set_panel_temp_override_sensor(Sensor *s);
   void set_temp_source_select(AutotermTempSourceSelect *select);
@@ -213,6 +217,9 @@ class AutotermUART : public Component {
     runtime_loaded_ = true;
     runtime_hours_last_published_ = NAN;
     publish_runtime_hours_(true);
+    session_runtime_hours_ = 0.0f;
+    session_runtime_last_published_ = NAN;
+    publish_session_runtime_(true);
 
     uint32_t now = millis();
     last_runtime_millis_ = now;
@@ -315,6 +322,7 @@ public:
   void advance_runtime_time_(uint32_t now);
   void set_heater_running_state_(bool running);
   void publish_runtime_hours_(bool force = false);
+  void publish_session_runtime_(bool force = false);
   void maybe_save_runtime_hours_(uint32_t now, bool force = false);
   bool is_heater_active_status_(uint16_t status_code) const;
 };
@@ -424,6 +432,12 @@ void AutotermUART::set_runtime_hours_sensor(Sensor *s) {
     publish_runtime_hours_(true);
 }
 
+void AutotermUART::set_session_runtime_sensor(Sensor *s) {
+  session_runtime_sensor_ = s;
+  if (session_runtime_sensor_ != nullptr && runtime_tracking_initialized_)
+    publish_session_runtime_(true);
+}
+
 void AutotermUART::set_panel_temp_override_sensor(Sensor *s) {
   panel_temp_override_sensor_ = s;
   if (panel_temp_override_sensor_ != nullptr) {
@@ -519,8 +533,10 @@ void AutotermUART::advance_runtime_time_(uint32_t now) {
     return;
 
   runtime_hours_ += static_cast<float>(delta) / 3600000.0f;
+  session_runtime_hours_ += static_cast<float>(delta) / 3600000.0f;
   runtime_dirty_ = true;
   publish_runtime_hours_();
+  publish_session_runtime_();
 }
 
 void AutotermUART::set_heater_running_state_(bool running) {
@@ -532,8 +548,13 @@ void AutotermUART::set_heater_running_state_(bool running) {
   heater_running_ = running;
   last_runtime_millis_ = now;
 
-  if (!heater_running_) {
+  if (heater_running_) {
+    session_runtime_hours_ = 0.0f;
+    session_runtime_last_published_ = NAN;
+    publish_session_runtime_(true);
+  } else {
     publish_runtime_hours_(true);
+    publish_session_runtime_(true);
     maybe_save_runtime_hours_(now, true);
   }
 }
@@ -555,6 +576,25 @@ void AutotermUART::publish_runtime_hours_(bool force) {
 
   runtime_hours_sensor_->publish_state(runtime_hours_);
   runtime_hours_last_published_ = runtime_hours_;
+}
+
+void AutotermUART::publish_session_runtime_(bool force) {
+  if (session_runtime_sensor_ == nullptr)
+    return;
+
+  bool should_publish = force;
+  if (!should_publish) {
+    if (std::isnan(session_runtime_last_published_) ||
+        std::fabs(session_runtime_hours_ - session_runtime_last_published_) >= 0.001f) {
+      should_publish = true;
+    }
+  }
+
+  if (!should_publish)
+    return;
+
+  session_runtime_sensor_->publish_state(session_runtime_hours_);
+  session_runtime_last_published_ = session_runtime_hours_;
 }
 
 void AutotermUART::maybe_save_runtime_hours_(uint32_t now, bool force) {

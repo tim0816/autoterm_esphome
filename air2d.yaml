@@ -91,6 +91,9 @@ autoterm_uart:
   runtime_hours:
     name: "Betriebsstunden"
     accuracy_decimals: 2
+  session_runtime:
+    name: "Laufzeit"
+    accuracy_decimals: 2
   fan_level:
     name: "Fan Level"
   panel_temp_override:

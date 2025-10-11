@@ -115,6 +115,17 @@ class AutotermUART : public Component {
   float panel_temp_last_value_c_{NAN};
   std::vector<uint8_t> display_to_heater_buffer_;
   std::vector<uint8_t> heater_to_display_buffer_;
+  bool thermostat_active_{false};
+  bool thermostat_heating_request_{false};
+  bool thermostat_waiting_for_idle_{false};
+  float thermostat_target_c_{20.0f};
+  float thermostat_hys_on_c_{2.0f};
+  float thermostat_hys_off_c_{1.0f};
+  uint8_t thermostat_level_{4};
+  uint8_t thermostat_sensor_source_{1};
+  uint8_t thermostat_last_sent_level_{255};
+  uint32_t thermostat_last_command_millis_{0};
+  uint32_t thermostat_last_evaluation_millis_{0};
 
   void set_uart_display(UARTComponent *u) { uart_display_ = u; }
   void set_uart_heater(UARTComponent *u) { uart_heater_ = u; }
@@ -159,7 +170,9 @@ class AutotermUART : public Component {
   void send_temperature_hold_mode(bool start, uint8_t temp_sensor, uint8_t set_temp);
   void send_temperature_to_fan_mode(bool start, uint8_t temp_sensor, uint8_t set_temp);
   void send_fan_only(uint8_t level);
-  void send_thermostat_placeholder();
+  void configure_thermostat_mode(float target_c, uint8_t level, uint8_t sensor_source,
+                                 float hys_on_c, float hys_off_c);
+  void disable_thermostat_mode();
 
   void loop() override {
     forward_and_sniff(uart_display_, uart_heater_, "display→heater", true);
@@ -200,6 +213,9 @@ class AutotermUART : public Component {
     uint32_t runtime_now = millis();
     advance_runtime_time_(runtime_now);
     maybe_save_runtime_hours_(runtime_now);
+
+    if (thermostat_active_)
+      evaluate_thermostat_control_();
   }
 
   void setup() override {
@@ -314,6 +330,12 @@ public:
   bool send_command_(uint8_t command, const std::vector<uint8_t> &payload, const char *log_label);
   uint16_t append_crc_(std::vector<uint8_t> &frame);
   static uint16_t crc16_modbus_(const uint8_t *data, size_t length);
+  void evaluate_thermostat_control_(bool force = false);
+  void handle_thermostat_status_update_(uint16_t status_code);
+  void send_thermostat_cooldown_(uint8_t source, uint8_t temp_byte);
+  float clamp_thermostat_target_(float target) const;
+  float clamp_thermostat_hys_on_(float value) const;
+  float clamp_thermostat_hys_off_(float value) const;
 
   void publish_temp_source_select_(uint8_t source);
   uint8_t clamp_temp_source_(uint8_t source) const;
@@ -332,10 +354,11 @@ public:
 // ===================
 class AutotermClimate : public climate::Climate {
  public:
-  void set_parent(AutotermUART *parent);
-  void set_default_level(uint8_t level);
-  void set_default_temperature(float temperature_c);
-  void set_default_temp_sensor(uint8_t sensor);
+ void set_parent(AutotermUART *parent);
+ void set_default_level(uint8_t level);
+ void set_default_temperature(float temperature_c);
+ void set_default_temp_sensor(uint8_t sensor);
+  void set_thermostat_hysteresis(float hys_on_c, float hys_off_c);
 
   void handle_status_update(uint16_t status_code, float internal_temp);
   void handle_settings_update(const AutotermUART::Settings &settings, bool from_display);
@@ -345,15 +368,19 @@ class AutotermClimate : public climate::Climate {
   void control(const climate::ClimateCall &call) override;
 
  private:
-  AutotermUART *parent_{nullptr};
-  float target_temperature_c_{20.0f};
-  float current_temperature_c_{NAN};
-  uint8_t fan_level_{4};
+ AutotermUART *parent_{nullptr};
+ float target_temperature_c_{20.0f};
+ float current_temperature_c_{NAN};
+ uint8_t fan_level_{4};
   uint8_t default_temp_sensor_{0x01};
   std::string preset_mode_{"Leistungsmodus"};
+  float thermostat_hys_on_c_{2.0f};
+  float thermostat_hys_off_c_{1.0f};
 
   static uint8_t clamp_level_(int level);
   static float clamp_temperature_(float temperature);
+  static float clamp_hysteresis_on_(float value);
+  static float clamp_hysteresis_off_(float value);
   std::string fan_mode_label_from_level_(uint8_t level) const;
   uint8_t fan_mode_label_to_level_(const std::string &label) const;
   std::string sanitize_preset_(const std::string &preset) const;
@@ -834,6 +861,9 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
 
   last_internal_temp_c_ = internal_temp;
   last_external_temp_c_ = external_temp;
+  handle_thermostat_status_update_(status_code);
+  if (thermostat_active_ && !thermostat_waiting_for_idle_)
+    evaluate_thermostat_control_(true);
 
   if (voltage_sensor_) voltage_sensor_->publish_state(voltage);
   if (status_sensor_) status_sensor_->publish_state(status_val);
@@ -996,8 +1026,179 @@ void AutotermUART::send_fan_only(uint8_t level) {
   send_command_(0x23, payload, "mode.fan_only");
 }
 
-void AutotermUART::send_thermostat_placeholder() {
-  ESP_LOGW("autoterm_uart", "Thermostat mode requested but not implemented yet");
+void AutotermUART::configure_thermostat_mode(float target_c, uint8_t level, uint8_t sensor_source,
+                                             float hys_on_c, float hys_off_c) {
+  float clamped_target = clamp_thermostat_target_(target_c);
+  uint8_t clamped_level = std::min<uint8_t>(level, 9);
+  uint8_t clamped_sensor = clamp_temp_source_(sensor_source);
+  float clamped_hys_on = clamp_thermostat_hys_on_(hys_on_c);
+  float clamped_hys_off = clamp_thermostat_hys_off_(hys_off_c);
+
+  bool was_active = thermostat_active_;
+  bool log_needed = !was_active ||
+                    thermostat_target_c_ != clamped_target ||
+                    thermostat_level_ != clamped_level ||
+                    thermostat_sensor_source_ != clamped_sensor ||
+                    thermostat_hys_on_c_ != clamped_hys_on ||
+                    thermostat_hys_off_c_ != clamped_hys_off;
+
+  thermostat_active_ = true;
+  thermostat_target_c_ = clamped_target;
+  thermostat_level_ = clamped_level;
+  thermostat_sensor_source_ = clamped_sensor;
+  thermostat_hys_on_c_ = clamped_hys_on;
+  thermostat_hys_off_c_ = clamped_hys_off;
+
+  if (thermostat_last_sent_level_ == 255)
+    thermostat_last_sent_level_ = thermostat_level_;
+
+  if (thermostat_heating_request_ && thermostat_last_sent_level_ != thermostat_level_) {
+    send_power_mode(false, thermostat_level_);
+    thermostat_last_command_millis_ = millis();
+    thermostat_last_sent_level_ = thermostat_level_;
+  } else if (!thermostat_heating_request_) {
+    thermostat_last_sent_level_ = thermostat_level_;
+  }
+
+  if (log_needed) {
+    ESP_LOGI("autoterm_uart",
+             "Thermostat config -> target=%.1f°C level=%u sensor=%u hys_on=%.1f°C hys_off=%.1f°C",
+             thermostat_target_c_, static_cast<unsigned>(thermostat_level_),
+             static_cast<unsigned>(thermostat_sensor_source_),
+             thermostat_hys_on_c_, thermostat_hys_off_c_);
+  }
+
+  evaluate_thermostat_control_(true);
+}
+
+void AutotermUART::disable_thermostat_mode() {
+  if (!thermostat_active_)
+    return;
+
+  ESP_LOGI("autoterm_uart", "Thermostat mode deactivated");
+  thermostat_active_ = false;
+  thermostat_heating_request_ = false;
+  thermostat_waiting_for_idle_ = false;
+  thermostat_last_sent_level_ = 255;
+}
+
+void AutotermUART::evaluate_thermostat_control_(bool force) {
+  if (!thermostat_active_)
+    return;
+
+  uint32_t now = millis();
+  if (!force && (now - thermostat_last_evaluation_millis_) < 1000)
+    return;
+  thermostat_last_evaluation_millis_ = now;
+
+  uint8_t effective_source = get_effective_temp_source();
+  if (effective_source != thermostat_sensor_source_)
+    thermostat_sensor_source_ = clamp_temp_source_(effective_source);
+  uint8_t source = thermostat_sensor_source_;
+
+  float current_temp = get_temperature_for_source(source);
+  if (!std::isfinite(current_temp))
+    return;
+
+  float on_threshold = thermostat_target_c_ - thermostat_hys_on_c_;
+  float off_threshold = thermostat_target_c_ + thermostat_hys_off_c_;
+
+  if (!thermostat_heating_request_ && !thermostat_waiting_for_idle_) {
+    if (current_temp < on_threshold) {
+      bool command_recent = thermostat_last_command_millis_ != 0 &&
+                            (now - thermostat_last_command_millis_) < 1000;
+      if (command_recent)
+        return;
+
+      bool heater_running_now = heater_running_;
+      if (!heater_running_now) {
+        send_power_mode(true, thermostat_level_);
+        thermostat_last_command_millis_ = millis();
+      } else if (thermostat_last_sent_level_ != thermostat_level_) {
+        send_power_mode(false, thermostat_level_);
+        thermostat_last_command_millis_ = millis();
+      }
+      thermostat_last_sent_level_ = thermostat_level_;
+      thermostat_heating_request_ = true;
+      ESP_LOGI("autoterm_uart",
+               "Thermostat: start heating (temp=%.1f°C target=%.1f°C level=%u)",
+               current_temp, thermostat_target_c_, static_cast<unsigned>(thermostat_level_));
+    }
+  } else if (thermostat_heating_request_) {
+    if (current_temp > off_threshold) {
+      bool command_recent = thermostat_last_command_millis_ != 0 &&
+                            (now - thermostat_last_command_millis_) < 1000;
+      if (command_recent)
+        return;
+
+      float cooldown_target = std::max(0.0f, thermostat_target_c_ - 5.0f);
+      uint8_t temp_byte = static_cast<uint8_t>(std::round(std::min(30.0f, cooldown_target)));
+      send_thermostat_cooldown_(source, temp_byte);
+      thermostat_heating_request_ = false;
+      thermostat_waiting_for_idle_ = true;
+      thermostat_last_command_millis_ = millis();
+      ESP_LOGI("autoterm_uart",
+               "Thermostat: cooling down (temp=%.1f°C target=%.1f°C -> temp_cmd=%u)",
+               current_temp, thermostat_target_c_, static_cast<unsigned>(temp_byte));
+    } else if (thermostat_last_sent_level_ != thermostat_level_ &&
+               (now - thermostat_last_command_millis_) > 1500) {
+      send_power_mode(false, thermostat_level_);
+      thermostat_last_command_millis_ = now;
+      thermostat_last_sent_level_ = thermostat_level_;
+      ESP_LOGD("autoterm_uart", "Thermostat: adjust level to %u",
+               static_cast<unsigned>(thermostat_level_));
+    }
+  }
+}
+
+void AutotermUART::handle_thermostat_status_update_(uint16_t status_code) {
+  if (!thermostat_active_)
+    return;
+
+  if (!thermostat_waiting_for_idle_ && !is_heater_active_status_(status_code))
+    thermostat_heating_request_ = false;
+
+  if (thermostat_waiting_for_idle_) {
+    if (status_code == 0x0305 || status_code == 0x0323) {
+      ESP_LOGD("autoterm_uart", "Thermostat: idle ventilation detected, sending standby");
+      send_standby();
+      thermostat_waiting_for_idle_ = false;
+      thermostat_last_command_millis_ = millis();
+    } else if (!is_heater_active_status_(status_code)) {
+      thermostat_waiting_for_idle_ = false;
+    }
+  }
+}
+
+void AutotermUART::send_thermostat_cooldown_(uint8_t source, uint8_t temp_byte) {
+  uint8_t sensor = map_source_to_heater_(source);
+  uint8_t clamped_temp = std::min<uint8_t>(temp_byte, 30);
+  std::vector<uint8_t> payload{0xFF, 0xFF, sensor, clamped_temp, 0x01, 0xFF};
+  send_command_(0x02, payload, "mode.thermostat.cooldown");
+}
+
+float AutotermUART::clamp_thermostat_target_(float target) const {
+  if (target < 0.0f)
+    return 0.0f;
+  if (target > 30.0f)
+    return 30.0f;
+  return target;
+}
+
+float AutotermUART::clamp_thermostat_hys_on_(float value) const {
+  if (value < 1.0f)
+    return 1.0f;
+  if (value > 5.0f)
+    return 5.0f;
+  return value;
+}
+
+float AutotermUART::clamp_thermostat_hys_off_(float value) const {
+  if (value < 0.0f)
+    return 0.0f;
+  if (value > 2.0f)
+    return 2.0f;
+  return value;
 }
 
 void AutotermUART::request_settings() {
@@ -1086,6 +1287,13 @@ void AutotermClimate::set_default_temp_sensor(uint8_t sensor) {
   default_temp_sensor_ = sensor;
 }
 
+void AutotermClimate::set_thermostat_hysteresis(float hys_on_c, float hys_off_c) {
+  thermostat_hys_on_c_ = clamp_hysteresis_on_(hys_on_c);
+  thermostat_hys_off_c_ = clamp_hysteresis_off_(hys_off_c);
+  if (thermostat_hys_off_c_ > thermostat_hys_on_c_)
+    thermostat_hys_off_c_ = thermostat_hys_on_c_;
+}
+
 climate::ClimateTraits AutotermClimate::traits() {
   climate::ClimateTraits traits;
   traits.set_supported_modes({
@@ -1172,8 +1380,10 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
                       !parent_->settings_valid_;
 
   if (new_mode == climate::CLIMATE_MODE_OFF) {
+    parent_->disable_thermostat_mode();
     parent_->send_standby();
   } else if (new_mode == climate::CLIMATE_MODE_FAN_ONLY) {
+    parent_->disable_thermostat_mode();
     if (previous_mode != climate::CLIMATE_MODE_OFF)
       parent_->send_standby();
     parent_->send_fan_only(new_level);
@@ -1182,17 +1392,24 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
       parent_->send_standby();
 
     if (new_preset == "Leistungsmodus") {
+      parent_->disable_thermostat_mode();
       parent_->send_power_mode(should_start, new_level);
     } else if (new_preset == "Heizen") {
+      parent_->disable_thermostat_mode();
       uint8_t sensor = resolve_temp_sensor_();
       uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
       parent_->send_temperature_hold_mode(should_start, sensor, temp_byte);
     } else if (new_preset == "Heizen+Lüften") {
+      parent_->disable_thermostat_mode();
       uint8_t sensor = resolve_temp_sensor_();
       uint8_t temp_byte = static_cast<uint8_t>(std::round(new_target_temp));
       parent_->send_temperature_to_fan_mode(should_start, sensor, temp_byte);
     } else if (new_preset == "Thermostat") {
-      parent_->send_thermostat_placeholder();
+      uint8_t sensor = resolve_temp_sensor_();
+      parent_->configure_thermostat_mode(new_target_temp, new_level, sensor,
+                                         thermostat_hys_on_c_, thermostat_hys_off_c_);
+    } else {
+      parent_->disable_thermostat_mode();
     }
   }
 
@@ -1250,6 +1467,22 @@ float AutotermClimate::clamp_temperature_(float temperature) {
   if (temperature > 30.0f)
     return 30.0f;
   return temperature;
+}
+
+float AutotermClimate::clamp_hysteresis_on_(float value) {
+  if (value < 1.0f)
+    return 1.0f;
+  if (value > 5.0f)
+    return 5.0f;
+  return value;
+}
+
+float AutotermClimate::clamp_hysteresis_off_(float value) {
+  if (value < 0.0f)
+    return 0.0f;
+  if (value > 2.0f)
+    return 2.0f;
+  return value;
 }
 
 std::string AutotermClimate::fan_mode_label_from_level_(uint8_t level) const {

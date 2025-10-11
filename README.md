@@ -40,8 +40,8 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 - **Fan Only**  
   Entspricht dem „Nur Lüften“-Modus der originalen Bedieneinheit. Der Brenner bleibt aus, lediglich der Lüfter läuft mit der vorgegebenen Stufe (`0–9`). 
 
-- **Thermostat (Platzhalter)**  
-  Vorgesehen für zukünftige Protokollerweiterungen. Der Code sendet derzeit nur einen Hinweis im Log (`send_thermostat_placeholder()`), echte Heizlogik ist noch nicht implementiert.
+- **Thermostat**  
+  Leistungsmodus mit einstellbarer Hysterese: Die Heizung läuft mit der gewählten Stufe, bis die Temperatur das obere Band `SET + Hys_off` überschreitet. Anschließend wird automatisch ein Abkühlzyklus gestartet (temporär `SET − 5 °C`, `wait_mode = 0x01`). Sobald der Status „Nachlauf-Lüftung“ erreicht ist, wird ein Standby-Kommando gesendet und der Brenner bleibt aus, bis die Temperatur wieder unter `SET − Hys_on` fällt. Standardmäßig gelten `Hys_on = 2 °C` und `Hys_off = 1 °C`; beide Werte lassen sich im Climate-Block per `thermostat_hysteresis_on` (1–5 °C) und `thermostat_hysteresis_off` (0–2 °C) anpassen.
 
 Jeder Modus kann über das Climate-Entity oder automatisiert per ESPHome/Home Assistant gesteuert werden. Nach Wechseln von Presets aktualisiert die Firmware die internen Settings und sendet passende UART-Frames an die Heizung.
 
@@ -52,6 +52,17 @@ Jeder Modus kann über das Climate-Entity oder automatisiert per ESPHome/Home As
 Die vollständige Beispielkonfiguration findest du in der Datei **`air2d.yaml`**.  
 Sie zeigt, wie die Autoterm-UART-Komponente in ESPHome eingebunden wird.  
 Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfiguration** an.
+
+Für den Thermostat-Modus kannst du die Hysterese direkt im Climate-Block definieren:
+
+```yaml
+climate:
+  id: autoterm_climate
+  thermostat_hysteresis_on: 2.0     # einschalten sobald Temp < SET - 2 °C
+  thermostat_hysteresis_off: 1.0    # ausschalten sobald Temp > SET + 1 °C
+```
+
+Die Werte lassen sich innerhalb der zulässigen Bereiche `1–5 °C` (Hys_on) bzw. `0–2 °C` (Hys_off) anpassen.
 
 ---
 

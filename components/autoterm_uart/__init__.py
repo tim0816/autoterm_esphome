@@ -21,6 +21,8 @@ CONF_CLIMATE = "climate"
 CONF_DEFAULT_LEVEL = "default_level"
 CONF_DEFAULT_TEMPERATURE = "default_temperature"
 CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
+CONF_THERMOSTAT_HYS_ON = "thermostat_hysteresis_on"
+CONF_THERMOSTAT_HYS_OFF = "thermostat_hysteresis_off"
 CONF_PANEL_TEMP_OVERRIDE = "panel_temp_override"
 CONF_PANEL_TEMP_OVERRIDE_SENSOR = "sensor"
 CONF_TEMP_SOURCE_SELECT = "temperature_source_select"
@@ -31,6 +33,8 @@ CLIMATE_SCHEMA = climate.climate_schema(AutotermClimate).extend({
     cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
     cv.Optional(CONF_DEFAULT_TEMPERATURE, default=20.0): cv.temperature,
     cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=2): cv.int_range(min=1, max=4),
+    cv.Optional(CONF_THERMOSTAT_HYS_ON, default=2.0): cv.float_range(min=1.0, max=5.0),
+    cv.Optional(CONF_THERMOSTAT_HYS_OFF, default=1.0): cv.float_range(min=0.0, max=2.0),
 })
 
 CONFIG_SCHEMA = cv.Schema({
@@ -124,6 +128,10 @@ async def to_code(config):
         cg.add(clim.set_default_level(climate_conf[CONF_DEFAULT_LEVEL]))
         cg.add(clim.set_default_temperature(climate_conf[CONF_DEFAULT_TEMPERATURE]))
         cg.add(clim.set_default_temp_sensor(climate_conf[CONF_DEFAULT_TEMP_SENSOR]))
+        cg.add(clim.set_thermostat_hysteresis(
+            climate_conf[CONF_THERMOSTAT_HYS_ON],
+            climate_conf[CONF_THERMOSTAT_HYS_OFF],
+        ))
         cg.add(var.set_climate(clim))
 
     if CONF_PANEL_TEMP_OVERRIDE in config:

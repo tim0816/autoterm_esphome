@@ -728,7 +728,7 @@ void AutotermUART::parse_status(const std::vector<uint8_t> &data) {
   uint16_t heater_temp_raw = (static_cast<uint16_t>(p[7]) << 8) | p[8];
   float heater_temp = NAN;
   if (heater_temp_raw != 0xFFFF)
-    heater_temp = static_cast<float>(heater_temp_raw) - 0x100;
+    heater_temp = (static_cast<float>(heater_temp_raw) - 0x100)/2;
   float fan_set_rpm = fan_set_raw * 60.0f;
   float fan_actual_rpm = fan_actual_raw * 60.0f;
   float pump_freq = pump_raw / 100.0f;

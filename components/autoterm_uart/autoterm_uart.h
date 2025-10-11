@@ -151,12 +151,13 @@ class AutotermUART : public Component {
     bool connected = uart_display_ != nullptr && (now - last_display_activity_) < 5000;
     if (connected != display_connected_state_) {
       display_connected_state_ = connected;
-      ESP_LOGD("autoterm_uart", "Display connection %s", connected ? "detected" : "lost");
       if (connected) {
+        ESP_LOGI("autoterm_uart", "Display connection detected");
         last_status_request_millis_ = now;
         last_settings_request_millis_ = now;
         last_panel_temp_send_millis_ = now;
       } else {
+        ESP_LOGW("autoterm_uart", "Display connection lost, switching to autonomous mode");
         last_panel_temp_send_millis_ = 0;
       }
     }
@@ -246,7 +247,7 @@ class AutotermUART : public Component {
       sprintf(temp, "%02X ", v);
       hex += temp;
     }
-    ESP_LOGI("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
+    ESP_LOGD("autoterm_uart", "[%s] Frame (%u bytes): %s", tag, (unsigned)data.size(), hex.c_str());
   }
 
   void parse_status(const std::vector<uint8_t> &data);
@@ -794,7 +795,7 @@ bool AutotermUART::send_command_(uint8_t command, const std::vector<uint8_t> &pa
   if (!payload_hex.empty())
     payload_hex.pop_back();
 
-  ESP_LOGW("autoterm_uart", "Sent %s (cmd=0x%02X len=%u payload=[%s] crc=%04X)",
+  ESP_LOGD("autoterm_uart", "Sent %s (cmd=0x%02X len=%u payload=[%s] crc=%04X)",
            log_label != nullptr ? log_label : "frame",
            command, static_cast<unsigned>(payload.size()), payload_hex.c_str(), crc);
   return true;

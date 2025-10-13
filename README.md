@@ -27,7 +27,7 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 ---
 
 ## Screenshots
-![Heizen](img/Screenshot_Heizen.png)
+![Heizen](img/Screenshot_Heizen.png) ![Heizen](img/Screenshot_HeizenLueften.png) ![Heizen](img/Screenshot_Leistungmodus.png)
 
 ---
 

@@ -5,38 +5,37 @@ import esphome.components.uart as uart
 import esphome.components.sensor as sensor
 import esphome.components.text_sensor as text_sensor
 import esphome.components.number as number
-import esphome.components.switch as switch
+import esphome.components.climate as climate
 import esphome.components.select as select
-import esphome.components.button as button
-import esphome.components.binary_sensor as binary_sensor
 
-DEPENDENCIES = ["sensor", "text_sensor", "number", "button", "switch", "select", "binary_sensor"]
+DEPENDENCIES = ["sensor", "text_sensor", "number", "climate"]
+AUTO_LOAD = ["sensor", "text_sensor", "number", "climate", "select"]
 
 autoterm_ns = cg.esphome_ns.namespace("autoterm_uart")
-AutotermPowerOnButton = autoterm_ns.class_("AutotermPowerOnButton", button.Button)
-AutotermPowerOffButton = autoterm_ns.class_("AutotermPowerOffButton", button.Button)
-AutotermFanModeButton = autoterm_ns.class_("AutotermFanModeButton", button.Button)
 AutotermFanLevelNumber = autoterm_ns.class_("AutotermFanLevelNumber", number.Number)
-AutotermSetTemperatureNumber = autoterm_ns.class_("AutotermSetTemperatureNumber", number.Number)
-AutotermWorkTimeNumber = autoterm_ns.class_("AutotermWorkTimeNumber", number.Number)
-AutotermPowerLevelNumber = autoterm_ns.class_("AutotermPowerLevelNumber", number.Number)
-AutotermVirtualPanelTemperatureNumber = autoterm_ns.class_(
-    "AutotermVirtualPanelTemperatureNumber", number.Number
-)
-AutotermVirtualPanelOverrideSwitch = autoterm_ns.class_(
-    "AutotermVirtualPanelOverrideSwitch", switch.Switch
-)
-AutotermTemperatureSourceSelect = autoterm_ns.class_("AutotermTemperatureSourceSelect", select.Select)
-AutotermUseWorkTimeSwitch = autoterm_ns.class_("AutotermUseWorkTimeSwitch", switch.Switch)
-AutotermWaitModeSwitch = autoterm_ns.class_("AutotermWaitModeSwitch", switch.Switch)
 AutotermUART = autoterm_ns.class_("AutotermUART", cg.Component)
+AutotermClimate = autoterm_ns.class_("AutotermClimate", climate.Climate)
+AutotermTempSourceSelect = autoterm_ns.class_("AutotermTempSourceSelect", select.Select)
 
-TEMPERATURE_SOURCE_OPTIONS = [
-    "internal sensor",
-    "panel sensor",
-    "external sensor",
-    "no automatic temperature control",
-]
+CONF_CLIMATE = "climate"
+CONF_DEFAULT_LEVEL = "default_level"
+CONF_DEFAULT_TEMPERATURE = "default_temperature"
+CONF_DEFAULT_TEMP_SENSOR = "default_temp_sensor"
+CONF_THERMOSTAT_HYS_ON = "thermostat_hysteresis_on"
+CONF_THERMOSTAT_HYS_OFF = "thermostat_hysteresis_off"
+CONF_PANEL_TEMP_OVERRIDE = "panel_temp_override"
+CONF_PANEL_TEMP_OVERRIDE_SENSOR = "sensor"
+CONF_TEMP_SOURCE_SELECT = "temperature_source_select"
+
+TEMP_SOURCE_OPTIONS = ["Intern", "Panel", "Extern", "Home Assistant"]
+
+CLIMATE_SCHEMA = climate.climate_schema(AutotermClimate).extend({
+    cv.Optional(CONF_DEFAULT_LEVEL, default=4): cv.int_range(min=0, max=9),
+    cv.Optional(CONF_DEFAULT_TEMPERATURE, default=20.0): cv.temperature,
+    cv.Optional(CONF_DEFAULT_TEMP_SENSOR, default=2): cv.int_range(min=1, max=4),
+    cv.Optional(CONF_THERMOSTAT_HYS_ON, default=2.0): cv.float_range(min=1.0, max=5.0),
+    cv.Optional(CONF_THERMOSTAT_HYS_OFF, default=1.0): cv.float_range(min=0.0, max=2.0),
+})
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AutotermUART),
@@ -52,54 +51,30 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("fan_speed_set"): sensor.sensor_schema(unit_of_measurement="rpm", icon="mdi:fan"),
     cv.Optional("fan_speed_actual"): sensor.sensor_schema(unit_of_measurement="rpm", icon="mdi:fan"),
     cv.Optional("pump_frequency"): sensor.sensor_schema(unit_of_measurement="Hz", icon="mdi:water-pump"),
+    cv.Optional("runtime_hours"): sensor.sensor_schema(
+        unit_of_measurement="h",
+        icon="mdi:clock-outline",
+        accuracy_decimals=2,
+        device_class=const.DEVICE_CLASS_DURATION,
+        state_class=const.STATE_CLASS_TOTAL_INCREASING,
+    ),
+    cv.Optional("session_runtime"): sensor.sensor_schema(
+        unit_of_measurement="h",
+        icon="mdi:timer-outline",
+        accuracy_decimals=2,
+        device_class=const.DEVICE_CLASS_DURATION,
+        state_class=const.STATE_CLASS_MEASUREMENT,
+    ),
 
     cv.Optional("status_text"): text_sensor.text_sensor_schema(icon="mdi:information"),
-    cv.Optional("temperature_source"): text_sensor.text_sensor_schema(icon="mdi:thermometer"),
-    cv.Optional("set_temperature"): sensor.sensor_schema(unit_of_measurement="°C", icon="mdi:thermometer"),
-    cv.Optional("work_time"): sensor.sensor_schema(unit_of_measurement="min", icon="mdi:clock-outline"),
-    cv.Optional("power_level"): sensor.sensor_schema(icon="mdi:fan"),
-    cv.Optional("wait_mode"): sensor.sensor_schema(icon="mdi:pause"),
-    cv.Optional("use_work_time"): sensor.sensor_schema(icon="mdi:timer-outline"),
-    cv.Optional("display_connected"): binary_sensor.binary_sensor_schema(icon="mdi:monitor"),
-    cv.Optional("virtual_panel_temperature"): cv.use_id(sensor.Sensor),
 
-    cv.Optional("power_on"): button.button_schema(class_=AutotermPowerOnButton, icon="mdi:power"),
-    cv.Optional("power_off"): button.button_schema(class_=AutotermPowerOffButton, icon="mdi:power-standby"),
-    cv.Optional("fan_mode"): button.button_schema(class_=AutotermFanModeButton, icon="mdi:fan"),
     cv.Optional("fan_level"): number.number_schema(class_=AutotermFanLevelNumber, icon="mdi:fan-speed-1"),
-    cv.Optional("set_temperature_control"): number.number_schema(
-        class_=AutotermSetTemperatureNumber,
-        icon="mdi:thermometer",
-    ),
-    cv.Optional("work_time_control"): number.number_schema(
-        class_=AutotermWorkTimeNumber,
-        icon="mdi:clock-outline",
-    ),
-    cv.Optional("power_level_control"): number.number_schema(
-        class_=AutotermPowerLevelNumber,
-        icon="mdi:fan",
-    ),
-    cv.Optional("virtual_panel_temperature_control"): number.number_schema(
-        class_=AutotermVirtualPanelTemperatureNumber,
-        icon="mdi:thermometer",
-    ),
-    cv.Optional("virtual_panel_override_switch"): switch.switch_schema(
-        class_=AutotermVirtualPanelOverrideSwitch,
-        icon="mdi:swap-horizontal",
-    ),
-    cv.Optional("temperature_source_control"): select.select_schema(
-        class_=AutotermTemperatureSourceSelect,
-        icon="mdi:thermometer",
-    ),
-    cv.Optional("use_work_time_switch"): switch.switch_schema(
-        class_=AutotermUseWorkTimeSwitch,
-        icon="mdi:timer-cog-outline",
-    ),
-    cv.Optional("wait_mode_switch"): switch.switch_schema(
-        class_=AutotermWaitModeSwitch,
-        icon="mdi:pause",
-    ),
 
+    cv.Optional(CONF_CLIMATE): CLIMATE_SCHEMA,
+    cv.Optional(CONF_PANEL_TEMP_OVERRIDE): cv.Schema({
+        cv.Required(CONF_PANEL_TEMP_OVERRIDE_SENSOR): cv.use_id(sensor.Sensor),
+    }),
+    cv.Optional(CONF_TEMP_SOURCE_SELECT): select.select_schema(class_=AutotermTempSourceSelect, icon="mdi:thermometer-probe"),
 
 })
 
@@ -122,11 +97,8 @@ async def to_code(config):
         ("fan_speed_set", "set_fan_speed_set_sensor"),
         ("fan_speed_actual", "set_fan_speed_actual_sensor"),
         ("pump_frequency", "set_pump_frequency_sensor"),
-        ("set_temperature", "set_set_temperature_sensor"),
-        ("work_time", "set_work_time_sensor"),
-        ("power_level", "set_power_level_sensor"),
-        ("wait_mode", "set_wait_mode_sensor"),
-        ("use_work_time", "set_use_work_time_sensor"),
+        ("runtime_hours", "set_runtime_hours_sensor"),
+        ("session_runtime", "set_session_runtime_sensor"),
     ]:
         if key in config:
             sens = await sensor.new_sensor(config[key])
@@ -134,31 +106,10 @@ async def to_code(config):
 
     for key, setter in [
         ("status_text", "set_status_text_sensor"),
-        ("temperature_source", "set_temperature_source_text_sensor"),
     ]:
         if key in config:
             txt = await text_sensor.new_text_sensor(config[key])
             cg.add(getattr(var, setter)(txt))
-
-    if "display_connected" in config:
-        bs = await binary_sensor.new_binary_sensor(config["display_connected"])
-        cg.add(var.set_display_connected_sensor(bs))
-
-    if "virtual_panel_temperature" in config:
-        temp = await cg.get_variable(config["virtual_panel_temperature"])
-        cg.add(var.set_virtual_panel_temp_sensor(temp))
-
-    if "power_on" in config:
-        btn = await button.new_button(config["power_on"])
-        cg.add(var.set_power_on_button(btn))
-
-    if "power_off" in config:
-        btn = await button.new_button(config["power_off"])
-        cg.add(var.set_power_off_button(btn))
-
-    if "fan_mode" in config:
-        btn = await button.new_button(config["fan_mode"])
-        cg.add(var.set_fan_mode_button(btn))
 
     if "fan_level" in config:
         conf = config["fan_level"]
@@ -168,46 +119,27 @@ async def to_code(config):
         step_v = conf.get("step", 1)
         num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
         cg.add(var.set_fan_level_number(num))
-    if "set_temperature_control" in config:
-        conf = config["set_temperature_control"]
-        min_v = conf.get("min_value", 0)
-        max_v = conf.get("max_value", 40)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_set_temperature_number(num))
-    if "work_time_control" in config:
-        conf = config["work_time_control"]
-        min_v = conf.get("min_value", 0)
-        max_v = conf.get("max_value", 255)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_work_time_number(num))
-    if "power_level_control" in config:
-        conf = config["power_level_control"]
-        min_v = conf.get("min_value", 0)
-        max_v = conf.get("max_value", 9)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_power_level_number(num))
-    if "virtual_panel_temperature_control" in config:
-        conf = config["virtual_panel_temperature_control"]
-        min_v = conf.get("min_value", 0)
-        max_v = conf.get("max_value", 40)
-        step_v = conf.get("step", 1)
-        num = await number.new_number(conf, min_value=min_v, max_value=max_v, step=step_v)
-        cg.add(var.set_virtual_panel_temp_number(num))
-    if "virtual_panel_override_switch" in config:
-        sw = await switch.new_switch(config["virtual_panel_override_switch"])
-        cg.add(var.set_virtual_panel_override_switch(sw))
-    if "temperature_source_control" in config:
-        sel = await select.new_select(
-            config["temperature_source_control"],
-            options=TEMPERATURE_SOURCE_OPTIONS,
-        )
-        cg.add(var.set_temperature_source_select(sel))
-    if "use_work_time_switch" in config:
-        sw = await switch.new_switch(config["use_work_time_switch"])
-        cg.add(var.set_use_work_time_switch(sw))
-    if "wait_mode_switch" in config:
-        sw = await switch.new_switch(config["wait_mode_switch"])
-        cg.add(var.set_wait_mode_switch(sw))
+
+    if CONF_CLIMATE in config:
+        climate_conf = config[CONF_CLIMATE]
+        clim = cg.new_Pvariable(climate_conf[const.CONF_ID])
+       # await cg.register_component(clim, climate_conf)
+        await climate.register_climate(clim, climate_conf)
+        cg.add(clim.set_default_level(climate_conf[CONF_DEFAULT_LEVEL]))
+        cg.add(clim.set_default_temperature(climate_conf[CONF_DEFAULT_TEMPERATURE]))
+        cg.add(clim.set_default_temp_sensor(climate_conf[CONF_DEFAULT_TEMP_SENSOR]))
+        cg.add(clim.set_thermostat_hysteresis(
+            climate_conf[CONF_THERMOSTAT_HYS_ON],
+            climate_conf[CONF_THERMOSTAT_HYS_OFF],
+        ))
+        cg.add(var.set_climate(clim))
+
+    if CONF_PANEL_TEMP_OVERRIDE in config:
+        override_conf = config[CONF_PANEL_TEMP_OVERRIDE]
+        src = await cg.get_variable(override_conf[CONF_PANEL_TEMP_OVERRIDE_SENSOR])
+        cg.add(var.set_panel_temp_override_sensor(src))
+
+    if CONF_TEMP_SOURCE_SELECT in config:
+        select_conf = config[CONF_TEMP_SOURCE_SELECT]
+        sel = await select.new_select(select_conf, options=TEMP_SOURCE_OPTIONS)
+        cg.add(var.set_temp_source_select(sel))

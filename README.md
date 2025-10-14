@@ -15,17 +15,40 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 
 ## 📦 Funktionsübersicht
 
-- 🧭 **Bidirektionale UART-Bridge** zwischen Display und Heizung  
-- 📊 **Status- und Sensordaten**: Innen-, Außen-, Heiz- und Paneltemperatur, Spannung, Pumpenfrequenz, Lüfterdrehzahl  
-- 🔘 **Steuerfunktionen**:
-  - Ein-/Ausschalten der Heizung  
-  - Nur Lüften (Fan Mode)  
-  - Einstellen von Zieltemperatur, Leistungsstufe und Arbeitszeit  
-  - Umschalten der Temperaturquelle  
-  - Aktivieren eines „virtuellen Panel“-Modus (Override)  
-- 🧩 **Kompatibel mit Home Assistant** (über ESPHome Integration)  
-- 🧾 **Debug-Modus**: zeigt empfangene und gesendete UART-Frames in HEX-Darstellung  
-- ⚙️ Unterstützt automatische Wiederverbindung und Statusabfrage, wenn kein Display erkannt wird  
+- 🧭 **Bidirektionale UART-Bridge** zwischen Display und Heizung inkl. Durchleitung aller Frames  
+- 📊 **Sensor-Outputs**: interne/externe/Heiz- und Paneltemperatur, Bordspannung, Statuscode/Text, Lüfterdrehzahlen (Soll/Ist) sowie Pumpenfrequenz  
+- 🌡️ **Climate-Entity mit Presets**: steuert Heizen, Automatik, Lüften und Leistungsstufen über ESPHome/Home Assistant  
+- 🎚️ **Direkte Stellgrößen**: separates Number-Entity für Lüfterstufe und Select-Entity zur Wahl der Temperaturquelle (inkl. „Home Assistant“-Feed)  
+- 🛰️ **Virtuelles Panel**: optionaler Override injiziert eine externe Temperatur in den Panel-Datenstrom  
+- 🧩 **Nahtlose Home-Assistant-Integration** durch native ESPHome-Komponenten  
+- 🧾 **Ausführliches Logging** der übertragenen Frames (HEX) im Debug-Level  
+- ⚙️ **Fallback-Logik**: automatische Status-/Settings-Abfragen, wenn kein Bedienteil erkannt wird  
+
+---
+
+## Screenshots
+<img src="img/Screenshot_Heizen.png" width="300"><img src="img/Screenshot_HeizenLueften.png" width="300"><img src="img/Screenshot_Leistungmodus.png" width="300">
+
+---
+
+## 🔥 Heizmodi im Detail
+
+- **Leistungsmodus**  
+  Offener Leistungsbetrieb: Die Heizung arbeitet ausschließlich mit der gewählten Stufe (`0–9`) und ignoriert Zieltemperaturen. Ideal zum schnellen Aufheizen oder wenn dauerhaft hohe Leistung benötigt wird.
+
+- **Heizen**  
+  Stufenregelung bis zur Zieltemperatur: Die Heizung nutzt die gewählte Temperaturquelle, erhöht die Leistung bis der Sollwert erreicht ist und läuft anschließend dauerhaft in der niedrigsten Stufe weiter.
+
+- **Heizen+Lüften**  
+  Hybridmodus: Die Heizung startet im Heizbetrieb, reduziert aber auf reinen Lüfterbetrieb, sobald die Zieltemperatur erreicht ist. Sobald es kühler wird, schaltet sie automatisch wieder auf Heizen. Intern wird `wait_mode = 0x01` genutzt.
+
+- **Fan Only**  
+  Entspricht dem „Nur Lüften“-Modus der originalen Bedieneinheit. Der Brenner bleibt aus, lediglich der Lüfter läuft mit der vorgegebenen Stufe (`0–9`). 
+
+- **Thermostat**  
+  Leistungsmodus mit einstellbarer Hysterese: Die Heizung läuft mit der gewählten Stufe, bis die Temperatur das obere Band `SET + Hys_off` überschreitet. Anschließend wird automatisch ein Abkühlzyklus gestartet (temporär `SET − 5 °C`, `wait_mode = 0x01`). Sobald der Status „Nachlauf-Lüftung“ erreicht ist, wird ein Standby-Kommando gesendet und der Brenner bleibt aus, bis die Temperatur wieder unter `SET − Hys_on` fällt. Standardmäßig gelten `Hys_on = 2 °C` und `Hys_off = 1 °C`; beide Werte lassen sich im Climate-Block per `thermostat_hysteresis_on` (1–5 °C) und `thermostat_hysteresis_off` (0–2 °C) anpassen.
+
+Jeder Modus kann über das Climate-Entity oder automatisiert per ESPHome/Home Assistant gesteuert werden. Nach Wechseln von Presets aktualisiert die Firmware die internen Settings und sendet passende UART-Frames an die Heizung.
 
 ---
 
@@ -34,6 +57,37 @@ Es erlaubt das **Überwachen und Steuern der Heizung** direkt über WLAN, MQTT o
 Die vollständige Beispielkonfiguration findest du in der Datei **`air2d.yaml`**.  
 Sie zeigt, wie die Autoterm-UART-Komponente in ESPHome eingebunden wird.  
 Passe die Datei unbedingt an deine **eigene Verkabelung, GPIOs und Gerätekonfiguration** an.
+
+Für den Thermostat-Modus kannst du die Hysterese direkt im Climate-Block definieren:
+
+```yaml
+climate:
+  id: autoterm_climate
+  thermostat_hysteresis_on: 2.0     # einschalten sobald Temp < SET - 2 °C
+  thermostat_hysteresis_off: 1.0    # ausschalten sobald Temp > SET + 1 °C
+```
+
+Die Werte lassen sich innerhalb der zulässigen Bereiche `1–5 °C` (Hys_on) bzw. `0–2 °C` (Hys_off) anpassen.
+
+---
+
+## 🧩 Entitäten in Home Assistant
+
+| Typ | Name (Standard) | Beschreibung |
+|------|----------------|--------------|
+| Climate | Autoterm Climate | Vollständiges Climate-Entity mit Modi, Presets und Zieltemperatur |
+| Sensor | Internal Temperature | Temperatur im Heizgerät (°C) |
+| Sensor | External Temperature | Externer Temperaturfühler (°C) |
+| Sensor | Heater Temperature | Temperatur am Wärmetauscher (°C) |
+| Sensor | Panel Temperature | Panel-/Display-Temperatur (°C, real oder virtuell) |
+| Sensor | Voltage | Versorgungsspannung der Heizung (V) |
+| Sensor | Fan RPM Set | Angeforderte Lüfterdrehzahl (rpm) |
+| Sensor | Fan RPM Actual | Gemessene Lüfterdrehzahl (rpm) |
+| Sensor | Pump Frequency | Takt der Dosierpumpe (Hz) |
+| Text Sensor | Status Text | Klartextstatus, inklusive HEX-Fallback bei unbekannten Codes |
+| Select | Temperature Source | Auswahl der Temperaturquelle (Intern/Panel/Extern/Home Assistant) |
+
+Für ein Panel-Temperatur-Override kann zusätzlich ein bestehender Sensor (z. B. aus Home Assistant) eingebunden und unter `panel_temp_override.sensor` referenziert werden. Dieser wird genutzt, wenn die Temperaturquelle „Home Assistant“ gewählt ist.
 
 ---
 
@@ -60,12 +114,12 @@ CRC-Berechnung siehe Quellen.
 | Code (`data[4]`) | Richtung | Bedeutung / Zweck | Antwortgröße | Beschreibung |
 |------------------|-----------|------------------|---------------|---------------|
 | `0x0F` | Heizung → Display | **Statusmeldung** | 0x13 Bytes | enthält Temperaturen, Spannung, Lüfter- und Pumpenwerte sowie Statuscode |
-| `0x02` | Heizung → Display | **Einstellungen (Settings)** | 6 Bytes | liefert aktuelle Parameter wie Temp-Quelle, Solltemp, Leistung usw. |
-| `0x03` | Display → Heizung | **Power-Off-Kommando** | – | beendet Heizvorgang |
-| `0x01` | Display → Heizung | **Power-ON mit Settings** | 6 Bytes | schaltet ein und überträgt aktuelle Settings |
-| `0x11` | Display ↔ Heizung | **Panel-Temperatur (Messwert)** | 1 Byte | realer oder virtueller Panel-Sensorwert (0–255 °C) |
-| `0x23` | Display → Heizung | **Fan-Mode-Start** | 4 Bytes | aktiviert „Nur Lüften“ mit bestimmter Drehzahl |
-| `0x02` | Display → Heizung | **Settings-Schreiben** | 6 Bytes | neue Soll-Werte an Heizung übertragen |
+| `0x02` | Heizung → Display | **Einstellungen (Settings)** | 6 Bytes | liefert aktuelle Parameter wie Temp-Quelle, Solltemp, Leistungsstufe usw. |
+| `0x01` | Display → Heizung | **Power-Mode Start/Set** | 6 Bytes | Startet die Heizung bzw. setzt Leistungsstufe (`FF FF 04 FF 02 <level>`) |
+| `0x02` | Display → Heizung | **Preset-/Temperatur-Update** | 6 Bytes | Überträgt Zieltemperatur & Sensorwahl (`FF FF <sensor> <temp> <preset> FF`) |
+| `0x03` | Display → Heizung | **Standby / Power-Off** | – | beendet Heizvorgang (kein Payload) |
+| `0x11` | Display ↔ Heizung | **Panel-Temperatur (Messwert)** | 1 Byte | realer oder virtueller Panel-Sensorwert (0–99 °C genutzt) |
+| `0x23` | Display → Heizung | **Fan-Only-Modus** | 4 Bytes | aktiviert „Nur Lüften“ (`FF FF <level> FF`) |
 
 ---
 
@@ -116,6 +170,7 @@ CRC-Berechnung siehe Quellen.
 | `0x0300` | heating |
 | `0x0323` | only fan |
 | `0x0304` | cooling down |
+| `0x0305` | idle ventilation |
 | `0x0400` | shutting down |
 | *andere* | unknown (HEX-Code wird mit angezeigt) |
 
@@ -149,7 +204,7 @@ AA 04 06 00 02 00 78 02 0F 00 05 39 3D
 
 ### 🔸 Beispiel: Panel-Temperatur-Frame (`0x11`)
 
-**Richtung:** Display → Heizung
+**Richtung:** Display ↔ Heizung
 
 ```
 AA 03 01 00 11 [temp_raw] CRC_H CRC_L
@@ -158,25 +213,26 @@ AA 03 01 00 11 [temp_raw] CRC_H CRC_L
 - `temp_raw` = 0–255 → 0–255 °C  
 - Wird alle 2 s übertragen (oder vom ESP simuliert, wenn „Virtual Panel Override“ aktiv ist)
 
-**Beispiel:**
+**Beispiel (Display → Heizung):**
 
 ```
-AA 04 01 00 11 10 B1 E5
+AA 03 01 00 11 10 9B 66
 ```
 
 → Temperatur 16 °C
 
 ---
 
-### 🔸 Power ON / OFF
+### 🔸 Power- und Standby-Kommandos
 
-**Power ON**
+**Power / Leistungsstufe (`0x01` bzw. `0x02`)**
 
 ```
-AA 03 06 00 01 [use_work_time] [work_time] [temp_src] [set_temp] [wait_mode] [power_lvl] CRC_H CRC_L
+AA 03 06 00 01 FF FF 04 FF 02 [level] CRC_H CRC_L   # Start mit Stufe <level>
+AA 03 06 00 02 FF FF 04 FF 02 [level] CRC_H CRC_L   # Stufe nach dem Start anpassen
 ```
 
-**Power OFF**
+**Standby (`0x03`)**
 
 ```
 AA 03 00 00 03 CRC_H CRC_L
@@ -218,37 +274,11 @@ Wenn der ESP kein Bedienteil erkennt, sendet er regelmäßig eigene Requests:
 |------|-----------|----------------|-------|
 | `0x0F` | Heater → Display | 19 B | Statusdaten |
 | `0x02` | Heater → Display | 6 B | Settings lesen |
-| `0x02` | Display → Heater | 6 B | Settings schreiben |
-| `0x01` | Display → Heater | 6 B | Power ON |
-| `0x03` | Display → Heater | 0 B | Power OFF |
-| `0x11` | Display → Heater | 1 B | Panel-Temperatur |
-| `0x23` | Display → Heater | 4 B | Fan Mode starten |
-
----
-
-## 🧩 Entitäten in Home Assistant
-
-| Typ | Name | Beschreibung |
-|------|------|--------------|
-| Sensor | Interne Temperatur | Temperatursensor im Gerät |
-| Sensor | Externe Temperatur | Außentemperaturfühler |
-| Sensor | Heizkörpertemperatur | Temperatur im Wärmetauscher |
-| Sensor | Panel Temperatur | Rohwert vom Panel (oder virtuell) |
-| Sensor | Spannung | Bordnetzspannung |
-| Sensor | Lüfter Soll (rpm) | RPM × 60 |
-| Sensor | Lüfter Ist (rpm) | RPM × 60 |
-| Sensor | Pumpenfrequenz | Hz |
-| Sensor | Statuswert (numerisch) | zusammengesetzt aus High/Low |
-| Text Sensor | Heizstatus (Text) | „heating“, „standby“ etc. inkl. HEX bei unknown |
-| Text Sensor | Temperaturquelle | „internal“, „panel“, „external“, „no automatic…“ |
-| Button | Heizung Ein/Aus | Startet oder stoppt den Heizprozess |
-| Number | Zieltemperatur | Solltemperatur |
-| Number | Lüfterstufe | 0–9 (manuell) |
-| Number | Arbeitszeit | 0–255 min |
-| Number | Leistungsstufe | 0–9 |
-| Switch | Warte-Modus | 1 = on, 2 = off |
-| Switch | Virtuelles Panel Override | ESP32 simuliert Panel |
-| Select | Temperaturquelle wählen | setzt 1/2/3/4 |
+| `0x02` | Display → Heater | 6 B | Temperatur-/Preset-Update |
+| `0x01` | Display → Heater | 6 B | Power-Mode Start/Stufe |
+| `0x03` | Display → Heater | 0 B | Standby (Power OFF) |
+| `0x11` | Display ↔ Heater | 1 B | Panel-Temperatur |
+| `0x23` | Display → Heater | 4 B | Fan-Only-Modus |
 
 ---
 

@@ -1326,8 +1326,8 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
 
   std::string new_preset = preset_mode_;
   bool preset_overridden = false;
-  if (call.get_custom_preset().has_value()) {
-    new_preset = sanitize_preset_(*call.get_custom_preset());
+  if (call.get_custom_preset() != nullptr) {
+    new_preset = sanitize_preset_(std::string(call.get_custom_preset()));
     preset_overridden = true;
   } else if (call.get_preset().has_value()) {
     new_preset = sanitize_preset_(preset_from_enum_(*call.get_preset()));

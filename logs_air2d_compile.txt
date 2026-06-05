@@ -1,0 +1,362 @@
+INFO ESPHome 2026.5.3
+INFO Reading configuration /config/esphome/air2d.yaml...
+INFO Updating https://github.com/tim0816/autoterm_esphome.git@None
+INFO Generating C++ source...
+INFO Setting CONFIG_LWIP_MAX_SOCKETS to 17 (TCP=11 [api=3, captive_portal=3, web_server=5], UDP=3 [captive_portal=1, mdns=2], TCP_LISTEN=3 [api=1, ota=1, web_server_base=1])
+INFO Deleting /data/build/air2d/.pioenvs
+INFO Deleting /data/build/air2d/dependencies.lock
+INFO Deleting /data/build/air2d/managed_components
+INFO Core config or version changed, cleaning build files...
+INFO Compiling app... Build path: /data/build/air2d
+Processing air2d (board: esp32-c3-devkitm-1; framework: arduino, espidf; platform: https://github.com/pioarduino/platform-espressif32/releases/download/55.03.38-1/platform-espressif32.zip)
+--------------------------------------------------------------------------------
+Created pioarduino Python virtual environment using uv: /root/.platformio/penv
+Installed esptool from tl-install path: /data/cache/platformio/packages/tool-esptoolpy
+Tool Manager: Installing file:///data/build/air2d/arduino_libs_stub
+Tool Manager: framework-arduinoespressif32-libs@5.5.4 has been installed!
+HARDWARE: ESP32C3 160MHz, 320KB RAM, 4MB Flash
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.8 
+ - framework-arduinoespressif32-libs @ 5.5.4 
+ - framework-espidf @ 3.50504.0 (5.5.4) 
+ - tool-cmake @ 4.0.3 
+ - tool-esp-rom-elfs @ 2024.10.11 
+ - tool-esptoolpy @ 5.2.0 
+ - tool-ninja @ 1.13.1 
+ - tool-riscv32-esp-elf-gdb @ 16.3.0+20250913 
+ - tool-scons @ 4.40801.0 (4.8.1) 
+ - toolchain-riscv32-esp @ 14.2.0+20260121
+Creating a new virtual environment for IDF Python dependencies using uv
+Using Python 3.12.10 environment at: /root/.platformio/penv/.espidf-5.5.4
+Installing ESP-IDF's Python dependencies with uv
+Using Python 3.12.10 environment at: /root/.platformio/penv/.espidf-5.5.4
+Resolved 31 packages in 445ms
+Downloading pygments (1.2MiB)
+Downloading pydantic-core (2.0MiB)
+Downloading cryptography (4.0MiB)
+ Downloaded pydantic-core
+ Downloaded cryptography
+ Downloaded pygments
+Prepared 31 packages in 281ms
+Installed 31 packages in 11ms
+ + annotated-types==0.7.0
+ + certifi==2026.5.20
+ + cffi==2.0.0
+ + charset-normalizer==3.4.7
+ + click==8.4.1
+ + colorama==0.4.6
+ + cryptography==44.0.3
+ + esp-idf-kconfig==3.7.0
+ + idf-component-manager==2.4.10
+ + idna==3.18
+ + jsonref==1.1.0
+ + markdown-it-py==4.2.0
+ + mdurl==0.1.2
+ + psutil==7.2.2
+ + pycparser==3.0
+ + pydantic==2.13.4
+ + pydantic-core==2.46.4
+ + pydantic-settings==2.14.1
+ + pygments==2.20.0
+ + pyparsing==3.3.2
+ + python-dotenv==1.2.2
+ + requests==2.34.2
+ + requests-file==3.0.1
+ + requests-toolbelt==1.0.0
+ + rich==15.0.0
+ + ruamel-yaml==0.19.1
+ + tqdm==4.67.3
+ + truststore==0.10.4
+ + typing-extensions==4.15.0
+ + typing-inspection==0.4.2
+ + urllib3==2.7.0
+Reading CMake configuration...
+Generating assembly for certificate bundle...
+No dependencies
+Compiling .pioenvs/air2d/src/esphome/components/api/api_buffer.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_connection.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_frame_helper.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_frame_helper_plaintext.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_overflow_buffer.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_pb2.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_pb2_service.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/api_server.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/list_entities.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/proto.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/api/subscribe_state.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/captive_portal/captive_portal.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/captive_portal/dns_server_esp32_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/climate/climate.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/climate/climate_mode.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/climate/climate_traits.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/core.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/crash_handler.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/gpio.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/hal.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/helpers.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/preferences.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/printf_stubs.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esp32/throw_stubs.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/esphome/ota/ota_esphome.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/homeassistant/sensor/homeassistant_sensor.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/json/json_util.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/logger/logger.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/logger/logger_esp32.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/logger/task_log_buffer_esp32.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/md5/md5.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/mdns/mdns_component.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/mdns/mdns_esp32.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/network/util.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/number/automation.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/number/number.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/number/number_call.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/number/number_traits.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/ota/ota_backend.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/ota/ota_backend_esp_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/ota/ota_bootloader_esp_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/ota/ota_partitions_esp_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/safe_mode/safe_mode.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/select/select.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/select/select_call.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/select/select_traits.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/sensor/automation.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/sensor/filter.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/sensor/sensor.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/sha256/sha256.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/socket/bsd_sockets_impl.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/socket/socket.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/text_sensor/filter.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/text_sensor/text_sensor.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/uart/uart.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/uart/uart_component.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/uart/uart_component_esp_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/uart/uart_debugger.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/watchdog/watchdog.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server/list_entities.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server/ota/ota_web_server.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server/web_server.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server_base/web_server_base.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server_idf/multipart.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server_idf/utils.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/web_server_idf/web_server_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/wifi/wifi_component.cpp.o
+Compiling .pioenvs/air2d/src/esphome/components/wifi/wifi_component_esp_idf.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/alloc_helpers.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/application.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/build_info_data.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/color.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/component.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/component_iterator.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/controller_registry.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/entity_base.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/gpio.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/helpers.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/log.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/lwip_fast_select.c.o
+Compiling .pioenvs/air2d/src/esphome/core/main_task.c.o
+Compiling .pioenvs/air2d/src/esphome/core/scheduler.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/static_task.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/time.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/util.cpp.o
+Compiling .pioenvs/air2d/src/esphome/core/wake/wake_freertos.cpp.o
+Compiling .pioenvs/air2d/src/main.cpp.o
+Generating LD script .pioenvs/air2d/esp-idf/esp_system/ld/memory.ld.in
+Generating LD script .pioenvs/air2d/memory.ld
+Generating LD script .pioenvs/air2d/esp-idf/esp_system/ld/sections.ld.in
+Compiling .pioenvs/air2d/app_trace/app_trace.c.o
+Compiling .pioenvs/air2d/app_trace/app_trace_util.c.o
+Compiling .pioenvs/air2d/app_trace/host_file_io.c.o
+Compiling .pioenvs/air2d/app_trace/port/port_uart.c.o
+Compiling .pioenvs/air2d/app_update/esp_ota_ops.c.o
+Archiving .pioenvs/air2d/esp-idf/app_trace/libapp_trace.a
+Compiling .pioenvs/air2d/app_update/esp_ota_app_desc.c.o
+Indexing .pioenvs/air2d/esp-idf/app_trace/libapp_trace.a
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_common.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_common_loader.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_clock_init.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_mem.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_random.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_efuse.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/flash_encrypt.c.o
+Archiving .pioenvs/air2d/esp-idf/app_update/libapp_update.a
+Compiling .pioenvs/air2d/bootloader_support/src/secure_boot.c.o
+Indexing .pioenvs/air2d/esp-idf/app_update/libapp_update.a
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_random_esp32c3.c.o
+Compiling .pioenvs/air2d/bootloader_support/bootloader_flash/src/bootloader_flash.c.o
+Compiling .pioenvs/air2d/bootloader_support/bootloader_flash/src/flash_qio_mode.c.o
+Compiling .pioenvs/air2d/bootloader_support/bootloader_flash/src/bootloader_flash_config_esp32c3.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_utility.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/flash_partitions.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/esp_image_format.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/bootloader_sha.c.o
+Compiling .pioenvs/air2d/bootloader_support/src/esp32c3/secure_boot_secure_features.c.o
+Compiling .pioenvs/air2d/console/commands.c.o
+Compiling .pioenvs/air2d/console/esp_console_common.c.o
+Compiling .pioenvs/air2d/console/esp_console_repl_internal.c.o
+Compiling .pioenvs/air2d/console/split_argv.c.o
+Archiving .pioenvs/air2d/esp-idf/bootloader_support/libbootloader_support.a
+Indexing .pioenvs/air2d/esp-idf/bootloader_support/libbootloader_support.a
+Compiling .pioenvs/air2d/console/linenoise/linenoise.c.o
+Compiling .pioenvs/air2d/console/esp_console_repl_chip.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_cmd.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_date.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_dbl.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_dstr.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_end.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_file.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_hashtable.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_int.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_lit.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_rem.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_rex.c.o
+Compiling .pioenvs/air2d/console/argtable3/arg_str.c.o
+In file included from src/esphome.h:22,
+                 from src/main.cpp:3:
+src/esphome/components/autoterm_uart/autoterm_uart.h: In member function 'void esphome::autoterm_uart::AutotermClimate::set_parent(esphome::autoterm_uart::AutotermUART*)':
+src/esphome/components/autoterm_uart/autoterm_uart.h:1250:13: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1250 |       this->custom_fan_mode = fan_label;
+      |             ^~~~~~~~~~~~~~~
+In file included from src/esphome/core/entity_includes.h:33,
+                 from src/esphome/core/application.h:39,
+                 from src/esphome/components/api/api_frame_helper.h:14,
+                 from src/esphome/components/api/api_connection.h:5,
+                 from src/esphome.h:4:
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1252:13: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1252 |       this->custom_fan_mode.reset();
+      |             ^~~~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1256:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_preset'; did you mean 'const char* esphome::climate::Climate::custom_preset_'? (not accessible from this context)
+ 1256 |     this->custom_preset = preset_mode_;
+      |           ^~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:409:15: note: declared private here
+  409 |   const char *custom_preset_{nullptr};
+      |               ^~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1258:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_preset'; did you mean 'const char* esphome::climate::Climate::custom_preset_'? (not accessible from this context)
+ 1258 |     this->custom_preset.reset();
+      |           ^~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:409:15: note: declared private here
+  409 |   const char *custom_preset_{nullptr};
+      |               ^~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h: In member function 'void esphome::autoterm_uart::AutotermClimate::set_default_level(uint8_t)':
+src/esphome/components/autoterm_uart/autoterm_uart.h:1272:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1272 |     this->custom_fan_mode = fan_label;
+      |           ^~~~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1274:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1274 |     this->custom_fan_mode.reset();
+      |           ^~~~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h: In member function 'virtual esphome::climate::ClimateTraits esphome::autoterm_uart::AutotermClimate::traits()':
+src/esphome/components/autoterm_uart/autoterm_uart.h:1310:38: error: no matching function for call to 'esphome::climate::ClimateTraits::set_supported_custom_presets(std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type)'
+ 1310 |   traits.set_supported_custom_presets(std::move(presets));
+      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+In file included from src/esphome/components/climate/climate.h:11:
+src/esphome/components/climate/climate_traits.h:156:8: note: candidate: 'template<unsigned int N> void esphome::climate::ClimateTraits::set_supported_custom_presets(const char* const (&)[N])'
+  156 |   void set_supported_custom_presets(const char *const (&presets)[N]) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:156:8: note:   template argument deduction/substitution failed:
+src/esphome/components/autoterm_uart/autoterm_uart.h:1310:38: note:   mismatched types 'const char* const [N]' and 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'}
+ 1310 |   traits.set_supported_custom_presets(std::move(presets));
+      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:145:8: note: candidate: 'void esphome::climate::ClimateTraits::set_supported_custom_presets(std::initializer_list<const char*>)'
+  145 |   void set_supported_custom_presets(std::initializer_list<const char *> presets) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:145:73: note:   no known conversion for argument 1 from 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'} to 'std::initializer_list<const char*>'
+  145 |   void set_supported_custom_presets(std::initializer_list<const char *> presets) {
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+src/esphome/components/climate/climate_traits.h:150:8: note: candidate: 'void esphome::climate::ClimateTraits::set_supported_custom_presets(const std::vector<const char*>&)'
+  150 |   void set_supported_custom_presets(const std::vector<const char *> &presets) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:150:70: note:   no known conversion for argument 1 from 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'} to 'const std::vector<const char*>&'
+  150 |   void set_supported_custom_presets(const std::vector<const char *> &presets) {
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1314:40: error: no matching function for call to 'esphome::climate::ClimateTraits::set_supported_custom_fan_modes(std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type)'
+ 1314 |   traits.set_supported_custom_fan_modes(std::move(fan_modes));
+      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:118:8: note: candidate: 'template<unsigned int N> void esphome::climate::ClimateTraits::set_supported_custom_fan_modes(const char* const (&)[N])'
+  118 |   void set_supported_custom_fan_modes(const char *const (&modes)[N]) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:118:8: note:   template argument deduction/substitution failed:
+src/esphome/components/autoterm_uart/autoterm_uart.h:1314:40: note:   mismatched types 'const char* const [N]' and 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'}
+ 1314 |   traits.set_supported_custom_fan_modes(std::move(fan_modes));
+      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:106:8: note: candidate: 'void esphome::climate::ClimateTraits::set_supported_custom_fan_modes(std::initializer_list<const char*>)'
+  106 |   void set_supported_custom_fan_modes(std::initializer_list<const char *> modes) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:106:75: note:   no known conversion for argument 1 from 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'} to 'std::initializer_list<const char*>'
+  106 |   void set_supported_custom_fan_modes(std::initializer_list<const char *> modes) {
+      |                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~
+src/esphome/components/climate/climate_traits.h:112:8: note: candidate: 'void esphome::climate::ClimateTraits::set_supported_custom_fan_modes(const std::vector<const char*>&)'
+  112 |   void set_supported_custom_fan_modes(const std::vector<const char *> &modes) {
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/climate/climate_traits.h:112:72: note:   no known conversion for argument 1 from 'std::remove_reference<std::set<std::__cxx11::basic_string<char> >&>::type' {aka 'std::set<std::__cxx11::basic_string<char> >'} to 'const std::vector<const char*>&'
+  112 |   void set_supported_custom_fan_modes(const std::vector<const char *> &modes) {
+      |                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1318:10: error: 'class esphome::climate::ClimateTraits' has no member named 'set_supports_current_temperature'
+ 1318 |   traits.set_supports_current_temperature(true);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h: In member function 'virtual void esphome::autoterm_uart::AutotermClimate::control(const esphome::climate::ClimateCall&)':
+src/esphome/components/autoterm_uart/autoterm_uart.h:1329:32: error: 'class esphome::StringRef' has no member named 'has_value'
+ 1329 |   if (call.get_custom_preset().has_value()) {
+      |                                ^~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1330:35: error: no match for 'operator*' (operand type is 'esphome::StringRef')
+ 1330 |     new_preset = sanitize_preset_(*call.get_custom_preset());
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1358:34: error: 'class esphome::StringRef' has no member named 'has_value'
+ 1358 |   if (call.get_custom_fan_mode().has_value())
+      |                                  ^~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1359:42: error: no match for 'operator*' (operand type is 'esphome::StringRef')
+ 1359 |     new_level = fan_mode_label_to_level_(*call.get_custom_fan_mode());
+      |                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compiling .pioenvs/air2d/console/argtable3/arg_utils.c.o
+src/esphome/components/autoterm_uart/autoterm_uart.h: In member function 'void esphome::autoterm_uart::AutotermClimate::apply_state_(esphome::climate::ClimateMode, const std::string&, uint8_t, float)':
+src/esphome/components/autoterm_uart/autoterm_uart.h:1611:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_preset'; did you mean 'const char* esphome::climate::Climate::custom_preset_'? (not accessible from this context)
+ 1611 |     this->custom_preset = preset_mode_;
+      |           ^~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:409:15: note: declared private here
+  409 |   const char *custom_preset_{nullptr};
+      |               ^~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1613:11: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_preset'; did you mean 'const char* esphome::climate::Climate::custom_preset_'? (not accessible from this context)
+ 1613 |     this->custom_preset.reset();
+      |           ^~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:409:15: note: declared private here
+  409 |   const char *custom_preset_{nullptr};
+      |               ^~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1618:13: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1618 |       this->custom_fan_mode = fan_label;
+      |             ^~~~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+src/esphome/components/autoterm_uart/autoterm_uart.h:1620:13: error: 'class esphome::autoterm_uart::AutotermClimate' has no member named 'custom_fan_mode'; did you mean 'const char* esphome::climate::Climate::custom_fan_mode_'? (not accessible from this context)
+ 1620 |       this->custom_fan_mode.reset();
+      |             ^~~~~~~~~~~~~~~
+src/esphome/components/climate/climate.h:402:15: note: declared private here
+  402 |   const char *custom_fan_mode_{nullptr};
+      |               ^~~~~~~~~~~~~~~~
+Compiling .pioenvs/air2d/console/argtable3/argtable3.c.o
+Compiling .pioenvs/air2d/cxx/cxx_exception_stubs.cpp.o
+Compiling .pioenvs/air2d/cxx/cxx_guards.cpp.o
+Compiling .pioenvs/air2d/cxx/cxx_init.cpp.o
+Compiling .pioenvs/air2d/driver/deprecated/adc_legacy.c.o
+Compiling .pioenvs/air2d/driver/deprecated/adc_dma_legacy.c.o
+Compiling .pioenvs/air2d/driver/deprecated/timer_legacy.c.o
+Archiving .pioenvs/air2d/esp-idf/console/libconsole.a
+Indexing .pioenvs/air2d/esp-idf/console/libconsole.a
+Compiling .pioenvs/air2d/driver/i2c/i2c.c.o
+Compiling .pioenvs/air2d/driver/deprecated/i2s_legacy.c.o
+Compiling .pioenvs/air2d/driver/deprecated/rmt_legacy.c.o
+Archiving .pioenvs/air2d/esp-idf/cxx/libcxx.a
+Indexing .pioenvs/air2d/esp-idf/cxx/libcxx.a
+Compiling .pioenvs/air2d/driver/deprecated/sigma_delta_legacy.c.o
+*** [.pioenvs/air2d/src/main.cpp.o] Error 1
+========================= [FAILED] Took 65.98 seconds =========================

@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -1247,15 +1246,15 @@ void AutotermClimate::set_parent(AutotermUART *parent) {
   {
     std::string fan_label = fan_mode_label_from_level_(fan_level_);
     if (!fan_label.empty())
-      this->custom_fan_mode = fan_label;
+      this->set_custom_fan_mode_(fan_label.c_str());
     else
-      this->custom_fan_mode.reset();
+      this->set_custom_fan_mode_(nullptr);
   }
   this->preset.reset();
   if (!preset_mode_.empty())
-    this->custom_preset = preset_mode_;
+    this->set_custom_preset_(preset_mode_.c_str());
   else
-    this->custom_preset.reset();
+    this->set_custom_preset_(nullptr);
   target_temperature_c_ = clamp_temperature_(target_temperature_c_);
   this->target_temperature = target_temperature_c_;
   if (!std::isnan(current_temperature_c_))
@@ -1269,9 +1268,9 @@ void AutotermClimate::set_default_level(uint8_t level) {
   this->fan_mode.reset();
   std::string fan_label = fan_mode_label_from_level_(fan_level_);
   if (!fan_label.empty())
-    this->custom_fan_mode = fan_label;
+    this->set_custom_fan_mode_(fan_label.c_str());
   else
-    this->custom_fan_mode.reset();
+    this->set_custom_fan_mode_(nullptr);
 }
 
 void AutotermClimate::set_default_temperature(float temperature_c) {
@@ -1302,20 +1301,16 @@ climate::ClimateTraits AutotermClimate::traits() {
       climate::CLIMATE_MODE_FAN_ONLY,
       climate::CLIMATE_MODE_AUTO,
   });
-  std::set<std::string> presets;
-  presets.insert("Leistungsmodus");
-  presets.insert("Heizen");
-  presets.insert("Heizen+Lüften");
-  presets.insert("Thermostat");
-  traits.set_supported_custom_presets(std::move(presets));
-  std::set<std::string> fan_modes;
-  for (int i = 0; i <= 9; i++)
-    fan_modes.insert("Stufe " + std::to_string(i));
-  traits.set_supported_custom_fan_modes(std::move(fan_modes));
+  static const char *const kPresets[] = {"Leistungsmodus", "Heizen", "Heizen+Lüften", "Thermostat"};
+  traits.set_supported_custom_presets(kPresets);
+  static const char *const kFanModes[] = {
+      "Stufe 0", "Stufe 1", "Stufe 2", "Stufe 3", "Stufe 4",
+      "Stufe 5", "Stufe 6", "Stufe 7", "Stufe 8", "Stufe 9",
+  };
+  traits.set_supported_custom_fan_modes(kFanModes);
   traits.set_visual_min_temperature(0.0f);
   traits.set_visual_max_temperature(30.0f);
   traits.set_visual_temperature_step(1.0f);
-  traits.set_supports_current_temperature(true);
   return traits;
 }
 
@@ -1326,8 +1321,8 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
 
   std::string new_preset = preset_mode_;
   bool preset_overridden = false;
-  if (call.get_custom_preset().has_value()) {
-    new_preset = sanitize_preset_(*call.get_custom_preset());
+  if (!call.get_custom_preset().empty()) {
+    new_preset = sanitize_preset_(call.get_custom_preset().str());
     preset_overridden = true;
   } else if (call.get_preset().has_value()) {
     new_preset = sanitize_preset_(preset_from_enum_(*call.get_preset()));
@@ -1355,8 +1350,8 @@ void AutotermClimate::control(const climate::ClimateCall &call) {
   }
 
   uint8_t new_level = fan_level_;
-  if (call.get_custom_fan_mode().has_value())
-    new_level = fan_mode_label_to_level_(*call.get_custom_fan_mode());
+  if (!call.get_custom_fan_mode().empty())
+    new_level = fan_mode_label_to_level_(call.get_custom_fan_mode().str());
   else if (call.get_fan_mode().has_value())
     new_level = fan_level_from_enum_(*call.get_fan_mode(), fan_level_);
   new_level = clamp_level_(new_level);
@@ -1608,16 +1603,16 @@ void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string 
   this->mode = mode;
   this->preset.reset();
   if (mode != climate::CLIMATE_MODE_FAN_ONLY && mode != climate::CLIMATE_MODE_OFF && !preset_mode_.empty())
-    this->custom_preset = preset_mode_;
+    this->set_custom_preset_(preset_mode_.c_str());
   else
-    this->custom_preset.reset();
+    this->set_custom_preset_(nullptr);
   this->fan_mode.reset();
   {
     std::string fan_label = fan_mode_label_from_level_(fan_level_);
     if (!fan_label.empty())
-      this->custom_fan_mode = fan_label;
+      this->set_custom_fan_mode_(fan_label.c_str());
     else
-      this->custom_fan_mode.reset();
+      this->set_custom_fan_mode_(nullptr);
   }
   this->target_temperature = target_temperature_c_;
   if (!std::isnan(current_temperature_c_))

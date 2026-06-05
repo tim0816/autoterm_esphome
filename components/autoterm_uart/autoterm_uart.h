@@ -1248,13 +1248,13 @@ void AutotermClimate::set_parent(AutotermUART *parent) {
     if (!fan_label.empty())
       this->set_custom_fan_mode_(fan_label.c_str());
     else
-      this->set_custom_fan_mode_(nullptr);
+      this->set_custom_fan_mode_("");
   }
   this->preset.reset();
   if (!preset_mode_.empty())
     this->set_custom_preset_(preset_mode_.c_str());
   else
-    this->set_custom_preset_(nullptr);
+    this->set_custom_preset_("");
   target_temperature_c_ = clamp_temperature_(target_temperature_c_);
   this->target_temperature = target_temperature_c_;
   if (!std::isnan(current_temperature_c_))
@@ -1270,7 +1270,7 @@ void AutotermClimate::set_default_level(uint8_t level) {
   if (!fan_label.empty())
     this->set_custom_fan_mode_(fan_label.c_str());
   else
-    this->set_custom_fan_mode_(nullptr);
+    this->set_custom_fan_mode_("");
 }
 
 void AutotermClimate::set_default_temperature(float temperature_c) {
@@ -1605,14 +1605,14 @@ void AutotermClimate::apply_state_(climate::ClimateMode mode, const std::string 
   if (mode != climate::CLIMATE_MODE_FAN_ONLY && mode != climate::CLIMATE_MODE_OFF && !preset_mode_.empty())
     this->set_custom_preset_(preset_mode_.c_str());
   else
-    this->set_custom_preset_(nullptr);
+    this->set_custom_preset_("");
   this->fan_mode.reset();
   {
     std::string fan_label = fan_mode_label_from_level_(fan_level_);
     if (!fan_label.empty())
       this->set_custom_fan_mode_(fan_label.c_str());
     else
-      this->set_custom_fan_mode_(nullptr);
+      this->set_custom_fan_mode_("");
   }
   this->target_temperature = target_temperature_c_;
   if (!std::isnan(current_temperature_c_))
